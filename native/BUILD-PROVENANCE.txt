@@ -1,0 +1,5 @@
+NDK 30.0.16248370; API 33; Release; C++ static runtime
+arm64-v8a: 13e30de2aec77115795738f87fe68e9a623159398faf4edbd144be571d7d0b10
+  16 KB LOAD alignment; all 26 ABI exports; dependencies: ['libm.so', 'liblog.so', 'libandroid.so', 'libOpenSLES.so', 'libdl.so', 'libc.so']
+x86_64: e1a080e4dce574c335a364a90f05493839e7f63269f148002fec6ac5f1c07c70
+  16 KB LOAD alignment; all 26 ABI exports; dependencies: ['libm.so', 'liblog.so', 'libandroid.so', 'libOpenSLES.so', 'libdl.so', 'libc.so']

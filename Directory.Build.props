@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <CodeBrixAudioCoreVersion Condition="'$(CodeBrixAudioCoreVersion)' == ''">1.0.269.1101</CodeBrixAudioCoreVersion>
+    <BuildVersion Condition="'$(BuildVersion)' == ''">1.$([MSBuild]::Subtract($([System.DateTime]::UtcNow.Year),2026)).$([System.DateTime]::UtcNow.DayOfYear).$([System.Convert]::ToInt32($([System.Math]::Floor($([System.DateTime]::UtcNow.TimeOfDay.TotalMinutes)))))</BuildVersion>
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-amd64')">/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('/home/jeremy/Android/Sdk')">/home/jeremy/Android/Sdk</AndroidSdkDirectory>
+  </PropertyGroup>
+</Project>

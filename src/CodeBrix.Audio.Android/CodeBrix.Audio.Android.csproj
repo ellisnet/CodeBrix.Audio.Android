@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android36.1</TargetFramework>
+    <SupportedOSPlatformVersion>33.0</SupportedOSPlatformVersion>
+    <AssemblyName>CodeBrix.Audio.Android</AssemblyName>
+    <RootNamespace>CodeBrix.Audio.Android</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>CodeBrix.Audio.Android.ApacheLicenseForever</PackageId>
+    <Version>$(BuildVersion)</Version>
+    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(BuildVersion)</FileVersion>
+    <Authors>Jeremy Ellis</Authors>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Native Oboe playback and capture with miniaudio codecs for CodeBrix.Audio on .NET 10 Android, API 33 and newer, ARM64 and x64.</Description>
+    <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Audio.Android</RepositoryUrl>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="$(CodeBrixAudioCoreVersion)" />
+    <AndroidNativeLibrary Include="native/arm64-v8a/libcodebrix_miniaudio.so" Abi="arm64-v8a" />
+    <AndroidNativeLibrary Include="native/x86_64/libcodebrix_miniaudio.so" Abi="x86_64" />
+    <None Include="../../README.md;../../AGENT-README.txt;../../LICENSE;../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
+  </ItemGroup>
+  <Target Name="CheckNativeBinaries" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('native/arm64-v8a/libcodebrix_miniaudio.so') Or !Exists('native/x86_64/libcodebrix_miniaudio.so')" Text="Build the Android native libraries first: bash tools/build-native.sh (from the repository root)." />
+  </Target>
+</Project>

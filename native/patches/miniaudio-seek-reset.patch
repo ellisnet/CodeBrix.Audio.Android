@@ -1,0 +1,45 @@
+--- a/vendor/miniaudio-80cf7b2/miniaudio.h
++++ b/vendor/miniaudio-80cf7b2/miniaudio.h
+@@ -47306,16 +47306,20 @@
+ 
+ MA_API ma_result ma_biquad_clear_cache(ma_biquad* pBQ)
+ {
++    ma_uint32 channel;
+     if (pBQ == NULL) {
+         return MA_INVALID_ARGS;
+     }
+ 
+-    if (pBQ->format == ma_format_f32) {
+-        pBQ->pR1->f32 = 0;
+-        pBQ->pR2->f32 = 0;
+-    } else {
+-        pBQ->pR1->s32 = 0;
+-        pBQ->pR2->s32 = 0;
++    /* CodeBrix: each channel has independent history, including the right channel. */
++    for (channel = 0; channel < pBQ->channels; channel += 1) {
++        if (pBQ->format == ma_format_f32) {
++            pBQ->pR1[channel].f32 = 0;
++            pBQ->pR2[channel].f32 = 0;
++        } else {
++            pBQ->pR1[channel].s32 = 0;
++            pBQ->pR2[channel].s32 = 0;
++        }
+     }
+ 
+     return MA_SUCCESS;
+@@ -67549,7 +67553,14 @@
+                 pDecoder->readPointerInPCMFrames = frameIndex;
+             }
+ 
+-            /* Reset the data converter so that any cached data in the resampler is cleared. */
++        }
++
++        /* CodeBrix: discard decoded read-ahead as well as resampler history after a seek.
++           Otherwise resampled playback emits pre-seek inputCache frames first. */
++        if (result == MA_SUCCESS) {
++            pDecoder->inputCacheConsumed = 0;
++            pDecoder->inputCacheRemaining = 0;
++            pDecoder->readPointerInPCMFrames = frameIndex;
+             ma_data_converter_reset(&pDecoder->converter);
+         }
+ 

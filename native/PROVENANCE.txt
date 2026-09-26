@@ -1,0 +1,18 @@
+Oboe 1.10.0: https://github.com/google/oboe
+Commit a81bb9f87d4105b84b682685d3bfbb5beca371d1, Apache-2.0.
+Vendored include/, src/, CMakeLists.txt, LICENSE, README.md.
+Local patch patches/oboe-ndk30.patch adapts AAudioLoader.h/.cpp to released NDK 30:
+avoid redeclaring types now provided by the NDK and check the new enum's underlying
+integer type. No device algorithm changes.
+
+Miniaudio 0.11.24 (80cf7b2) and stb_vorbis (31c1ad3): copied from
+CodeBrix.Audio native/miniaudio sources, MIT/Unlicense; see LICENSE-MiniAudio.txt.
+Local patch patches/miniaudio-seek-reset.patch fixes seek reset: discard decoder
+read-ahead and reset conversion state after a successful seek, and clear biquad
+history for every channel. Host tests compare resampled PCM before/after seek-to-zero.
+stb_vorbis is unmodified. These codec fixes apply only to this Android native build.
+
+No desktop native binary is rebuilt or changed by this Android build.
+UPSTREAM-SHA256.txt records original source hashes; VENDOR-SHA256.txt records the
+current patched sources. Patches use paths relative to native/ and are already
+applied. BUILD-PROVENANCE.txt records the packaged binaries and toolchain.

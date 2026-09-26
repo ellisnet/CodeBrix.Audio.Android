@@ -1,0 +1,26 @@
+--- a/vendor/oboe/src/aaudio/AAudioLoader.cpp
++++ b/vendor/oboe/src/aaudio/AAudioLoader.cpp
+@@ -589,7 +589,9 @@
+ // which is the first version to support Android B (API 36).
+ #if __NDK_MAJOR__ >= 30
+ 
+-    ASSERT_INT32(AAudio_DeviceType);
++    // CodeBrix: NDK 30 declares a fixed-underlying-type enum, with the same ABI.
++    static_assert(std::is_same<int32_t, std::underlying_type<AAudio_DeviceType>::type>::value,
++                  "AAudio_DeviceType must have an int32_t underlying type");
+     static_assert((int32_t)DeviceType::BuiltinEarpiece == AAUDIO_DEVICE_BUILTIN_EARPIECE, ERRMSG);
+     static_assert((int32_t)DeviceType::BuiltinSpeaker == AAUDIO_DEVICE_BUILTIN_SPEAKER, ERRMSG);
+     static_assert((int32_t)DeviceType::WiredHeadset == AAUDIO_DEVICE_WIRED_HEADSET, ERRMSG);
+--- a/vendor/oboe/src/aaudio/AAudioLoader.h
++++ b/vendor/oboe/src/aaudio/AAudioLoader.h
+@@ -112,8 +112,8 @@
+ typedef int32_t aaudio_policy_t;
+ #endif
+ 
+-// TODO: find the first NDK version containing the following values
+-#if OBOE_USING_NDK && __NDK_MAJOR__ <= 30
++// CodeBrix: released NDK 30 provides these definitions in AAudio.h.
++#if OBOE_USING_NDK && __NDK_MAJOR__ < 30
+ typedef enum AAudio_FallbackMode : int32_t {
+     AAUDIO_FALLBACK_MODE_DEFAULT = 0,
+     AAUDIO_FALLBACK_MODE_MUTE = 1,
