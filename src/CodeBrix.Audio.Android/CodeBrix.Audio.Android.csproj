@@ -8,6 +8,25 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-amd64')">/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('/home/jeremy/Android/Sdk')">/home/jeremy/Android/Sdk</AndroidSdkDirectory>
+  </PropertyGroup>
+
+  <!--
+    Package / assembly version: date-stamped and auto-incrementing, 1.<years since 2026>.<day of
+    year>.<minute of day>, every field from UTC "now". Strictly increasing; a fresh version on every
+    build; two builds in the same UTC minute share one. A BuildVersion passed on the command line
+    (tools/build-local.sh does this) is a global property and wins over the value computed here.
+  -->
+  <PropertyGroup>
+    <_VersionBaseYear>2026</_VersionBaseYear>
+    <_VersionYears>$([MSBuild]::Subtract($([System.DateTime]::UtcNow.Year), $(_VersionBaseYear)))</_VersionYears>
+    <_VersionDayOfYear>$([System.DateTime]::UtcNow.DayOfYear)</_VersionDayOfYear>
+    <_VersionMinuteOfDay>$([System.Convert]::ToInt32($([System.Math]::Floor($([System.DateTime]::UtcNow.TimeOfDay.TotalMinutes)))))</_VersionMinuteOfDay>
+    <BuildVersion Condition="'$(BuildVersion)' == ''">1.$(_VersionYears).$(_VersionDayOfYear).$(_VersionMinuteOfDay)</BuildVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <PackageId>CodeBrix.Audio.Android.ApacheLicenseForever</PackageId>
     <Version>$(BuildVersion)</Version>
     <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
@@ -21,7 +40,9 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="$(CodeBrixAudioCoreVersion)" />
+    <!-- THE ONE PLACE the Core version lives. It must be a PUBLISHED version on nuget.org whenever this
+         package is published; the host-test and sample csproj files carry the same number. -->
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.269.1270" />
     <AndroidNativeLibrary Include="native/arm64-v8a/libcodebrix_miniaudio.so" Abi="arm64-v8a" />
     <AndroidNativeLibrary Include="native/x86_64/libcodebrix_miniaudio.so" Abi="x86_64" />
     <None Include="../../README.md;../../AGENT-README.txt;../../LICENSE;../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />

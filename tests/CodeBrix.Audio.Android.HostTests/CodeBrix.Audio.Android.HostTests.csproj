@@ -7,7 +7,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="$(CodeBrixAudioCoreVersion)" />
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.269.1270" />
     <PackageReference Include="xunit.v3" Version="4.0.1" />
     <Compile Include="../../src/CodeBrix.Audio.Android/Internal/MidiByteParser.cs" Link="MidiByteParser.cs" />
     <None Include="../../artifacts/native/host/libcodebrix_miniaudio.so" Link="libcodebrix_miniaudio.so" CopyToOutputDirectory="PreserveNewest" />

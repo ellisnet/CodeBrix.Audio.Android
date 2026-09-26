@@ -15,7 +15,8 @@ Do not use an Android emulator/AVD for this project on this workstation.
   mixing, synthesis, effects, metadata, MIDI and file APIs retain their behavior.
 - One explicit Android startup registration using application context. Permission
   prompts, foreground services and UI lifecycle decisions belong to the application.
-- Inter-repository development uses pinned packages and a local feed.
+- Inter-repository development uses pinned packages. Published packages come from
+  nuget.org; a local feed is used only for packages not yet published.
 
 ## Work and verification
 
@@ -38,29 +39,48 @@ so build commands explicitly select `/usr/lib/jvm/java-21-openjdk-amd64`.
 Future .NET 11/API 37 compilation, API 38 and Googlebook runtime validation remain
 future compatibility work; these targets are not claimed tested here.
 
+## Package versions
+
+Package versions are literal `PackageReference` versions in the csproj files; there
+is no Directory.Build.props. The library csproj pins Core, and it must name a version
+that is on nuget.org whenever this package is published. The host-test csproj and the
+sample carry the same Core-family number (the sample through ModestSynth), and the
+sample also pins the published Opus package and defaults `AndroidAudioVersion` to
+the Android package it consumes; set the latter to the published Android version
+once one exists. Core, Desktop, ModestSynth and Opus are all published, so the
+library and the host tests restore from nuget.org alone:
+
+```bash
+dotnet build src/CodeBrix.Audio.Android/CodeBrix.Audio.Android.csproj -c Release
+bash tools/test-host.sh
+```
+
 ## Build from sibling checkouts
 
-Run commands in this repository. Install the released .NET 10 Android workload,
-Android SDK 36.1, JDK 21, CMake and NDK 30 first. `Directory.Build.props` selects
-this workstation's SDK/JDK only if those locations exist; elsewhere pass
+This is the coordinated-change path, for when Core or Opus and this repository
+must change together before any of them is published. Run commands in this repository. Install the released .NET 10 Android workload,
+Android SDK 36.1, JDK 21, CMake and NDK 30 first. The library and sample csproj files
+select this workstation's SDK/JDK only if those locations exist; elsewhere pass
 `-p:AndroidSdkDirectory=... -p:JavaSdkDirectory=...` to dotnet. Native builds accept
 `ANDROID_SDK_ROOT` and `CODEBRIX_ANDROID_NDK` environment overrides.
 
 Choose one fresh date-stamped version for a coordinated build. Do not reuse a
 version whose packages are already in NuGet's global cache after changing their
-contents. The following script builds Core/Desktop/ModestSynth, then Opus, then
+contents. Raise the Core pin in the Opus library csproj and in this repository's
+library and host-test csproj files to that version first; the script checks and
+refuses to build otherwise. It then builds Core/Desktop/ModestSynth, then Opus, then
 both Android native ABIs and the Android package:
 
 ```bash
-bash tools/build-local.sh 1.0.269.1101
+bash tools/build-local.sh <fresh-version>
 ```
 
 The default local feed is `../CodeBrix.Audio/artifacts/android-port/feed`.
 Override sibling paths with `CODEBRIX_AUDIO_REPO` / `CODEBRIX_OPUS_REPO`, or the
 feed with `CODEBRIX_LOCAL_FEED`. The script publishes nothing, installs no tools
-and does not touch CodeBrix.Android. `CodeBrixAudioCoreVersion` in both downstream
-repositories pins the development Core package; update it to the released Core
-version before releasing dependents.
+and does not touch CodeBrix.Android. The Core pins in both downstream repositories
+then name the development Core package; set them back to a released Core version
+before releasing dependents.
 
 For just the native libraries, run `bash tools/build-native.sh`. It verifies the
 vendored source manifest, builds both ABIs, strips the shared objects and checks
@@ -77,9 +97,11 @@ artifact locations and the distinction between host checks and pending device te
 feed="$(realpath ../CodeBrix.Audio/artifacts/android-port/feed)"
 dotnet test --solution ../CodeBrix.Audio/CodeBrix.Audio.slnx -c Release --no-build
 dotnet test --solution ../CodeBrix.Audio.Opus/CodeBrix.Audio.Opus.slnx -c Release --no-build
-bash tools/test-host.sh -p:CodeBrixAudioCoreVersion=1.0.269.1101 \
-  -p:RestoreSources="$feed%3Bhttps://api.nuget.org/v3/index.json"
+bash tools/test-host.sh -p:RestoreSources="$feed%3Bhttps://api.nuget.org/v3/index.json"
 ```
+
+Against published packages, `bash tools/test-host.sh` with no arguments uses the
+pinned Core from nuget.org.
 
 The host tests exercise the actual codec-only miniaudio/stb build: WAV, MP3, FLAC,
 Ogg/Vorbis, rate conversion, seek reset, WAV encoding and MIDI byte parsing. They
@@ -96,17 +118,26 @@ unchanged consumer binary with the new managed assemblies.
 ## Diagnostics APK
 
 The sample intentionally consumes the packed NuGet artifacts, not project
-references, to verify transitive assembly and native packaging. From this root:
+references, to verify transitive assembly and native packaging. Once the Android
+package is published and the sample's `AndroidAudioVersion` default names it, the
+sample builds from nuget.org alone:
+
+```bash
+dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj -c Debug
+dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj -c Release --no-restore
+```
+
+Before that, pack the Android package locally (the library build writes it to
+`src/CodeBrix.Audio.Android/bin/Release/`, or `tools/build-local.sh` copies it into
+the feed) and point the sample at it. Core and Opus resolve from nuget.org:
 
 ```bash
 feed="$(realpath ../CodeBrix.Audio/artifacts/android-port/feed)"
 dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj -c Debug \
-  -p:AndroidAudioVersion=1.0.269.1101 -p:OpusVersion=1.0.269.1101 \
-  -p:CodeBrixAudioCoreVersion=1.0.269.1101 \
+  -p:AndroidAudioVersion=<packed-version> \
   -p:RestoreSources="$feed%3Bhttps://api.nuget.org/v3/index.json"
 dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj -c Release --no-restore \
-  -p:AndroidAudioVersion=1.0.269.1101 -p:OpusVersion=1.0.269.1101 \
-  -p:CodeBrixAudioCoreVersion=1.0.269.1101
+  -p:AndroidAudioVersion=<packed-version>
 ```
 
 Both configurations include ARM64 and x64. Release uses the workload's normal
