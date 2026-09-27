@@ -13,8 +13,9 @@ AGENT-README FILES (consumer documentation, one per NuGet package)
       CodeBrix.Audio.Android.ApacheLicenseForever - the Android platform package
       for CodeBrix.Audio: device playback and capture through Android's native
       low-latency audio path, native WAV / MP3 / FLAC / Ogg Vorbis codecs,
-      audio-focus and device-change helpers, and MIDI 1.0 ports, for the shared
-      managed engine that ships in CodeBrix.Audio.Core.
+      audio-focus and device-change helpers, MIDI 1.0 ports, and extraction of
+      packaged sample libraries out of the APK, for the shared managed engine
+      that ships in CodeBrix.Audio.Core.
 
 MAINTAINER AND EXTRAS
 ---------------------

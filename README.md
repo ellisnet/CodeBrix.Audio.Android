@@ -1,6 +1,6 @@
 # CodeBrix.Audio.Android
 
-The Android platform package for [CodeBrix.Audio](https://github.com/ellisnet/CodeBrix.Audio): device playback and capture through Android's native low-latency audio path, native WAV, MP3, FLAC and Ogg Vorbis codecs, audio-focus and device-change helpers, and MIDI 1.0 ports, for the shared managed audio engine that ships in CodeBrix.Audio.Core. CodeBrix.Audio.Android is provided as a .NET 10 for Android library and associated `CodeBrix.Audio.Android.ApacheLicenseForever` NuGet package.
+The Android platform package for [CodeBrix.Audio](https://github.com/ellisnet/CodeBrix.Audio): device playback and capture through Android's native low-latency audio path, native WAV, MP3, FLAC and Ogg Vorbis codecs, audio-focus and device-change helpers, MIDI 1.0 ports, and one-call extraction of packaged sample libraries out of the APK, for the shared managed audio engine that ships in CodeBrix.Audio.Core. CodeBrix.Audio.Android is provided as a .NET 10 for Android library and associated `CodeBrix.Audio.Android.ApacheLicenseForever` NuGet package.
 
 CodeBrix.Audio.Android supports applications and assemblies that target Microsoft .NET version 10.0 and later.
 Microsoft .NET version 10.0 is a Long-Term Supported (LTS) version of .NET, and was released on Nov 11, 2025; and will be actively supported by Microsoft until Nov 14, 2028.
@@ -37,6 +37,7 @@ This is the Android counterpart of `CodeBrix.Audio.MitLicenseForever`, the deskt
 * An `AudioDevicesChanged` event and refreshed device lists when routes are plugged or unplugged
 * Per-device diagnostics through `IAndroidAudioDevice.GetDiagnostics()`: callback count, underruns, burst and buffer sizes, the selected device, native and managed errors, and the allocations and longest time observed inside callbacks
 * MIDI 1.0 byte-stream input and output ports (USB, virtual and paired Bluetooth devices) through the engine's shared MIDI API, with running status, fragmented SysEx and interleaved real-time messages handled
+* `AndroidPackagedAssets`, which copies a file or folder packaged as an Android asset out of the APK into private storage once per installed build and returns its path - the bridge between sample-library packages that deliver a SoundFont, SFZ or Decent Sampler folder as files and an APK that holds them only as assets
 * ARM64 and x64 devices, with 16 KB memory pages supported by the native libraries
 
 ## Requirements
@@ -112,6 +113,21 @@ microphone.OnAudioProcessed += (samples, capability) =>
 };
 microphone.Start();
 ```
+
+### Use a packaged sample library
+
+```csharp
+using CodeBrix.Audio.Android;
+using CodeBrix.Audio.Samples.FluidR3Gm;
+
+// The SoundFont is packaged as an Android asset. Extract it once (a background
+// thread; it is a large file), then point the instrument library at the copy.
+var path = await AndroidPackagedAssets.MaterializeAsync("FluidR3_GM.sf2");
+FluidR3GmInstrumentLibrary.UseSoundFontAt(path);
+FluidR3GmInstrumentLibrary.Register();
+```
+
+The copy is reused on every later launch and refreshed automatically after the application is updated. A folder-based library, such as an SFZ or Decent Sampler set, is extracted the same way by naming its asset folder.
 
 ### Read the stream diagnostics
 

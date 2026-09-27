@@ -79,7 +79,13 @@ REPOSITORY LAYOUT
       AndroidAudioFocus.cs        public focus helper
       AndroidAudioDiagnostics.cs  the diagnostics record + IAndroidAudioDevice
       AndroidMidiBackend.cs       IMidiBackend over Android's MIDI service
+      AndroidPackagedAssets.cs    extracts packaged assets (sample libraries)
+                                  out of the APK into private storage, once
+                                  per installed build, and hands back paths
       Internal/
+          AssetStamp.cs           the platform-neutral half of that: asset-path
+                                  validation, on-disk layout, the per-install
+                                  stamp (linked into the test project)
           Native.cs               LibraryImport declarations for the cb_oboe_*
                                   C ABI, and the StreamHandle SafeHandle
           OboeStream.cs           one native stream: open / start / stop /
@@ -522,6 +528,22 @@ NOTES
   - The MIDI backend's OpenDevice completion has a five-second timeout and
     closes a device that arrives late; MidiByteParser caps SysEx at 1 MiB.
     Both limits are documented in AGENT-README.txt; change them there too.
+  - AndroidPackagedAssets STAMPS an extracted copy with the application's
+    version code AND LastUpdateTime, so a developer redeploy with the same
+    version code still re-extracts. It writes under a ".codebrix-partial" name
+    and renames into place, so a crash mid-copy can never leave a copy that
+    passes as complete.
+  - PENDING WIRING INTO CORE. CodeBrix.Audio (the Core repository) gains a
+    locator seam, CodeBrix.Audio.Instruments.PackagedAssets, through which
+    instrument packages find the files they ship. When a Core carrying it is
+    PUBLISHED and this repository's Core pin is raised to it, add ONE line to
+    CodeBrixAndroidAudio.Initialize - register an IPackagedAssetLocator whose
+    Locate calls AndroidPackagedAssets.Materialize and whose Exists calls
+    IsMaterialized - so instrument packages find their extracted asset with
+    no application code. Until then this package compiles against the
+    published Core and must not reference that seam; applications hand the
+    returned path to the library (FluidR3GmInstrumentLibrary.UseSoundFontAt
+    and the like), which keeps working afterwards as the explicit override.
   - SupportedDataFormats is EMPTY for every DeviceInfo on purpose: Android's
     advertised route formats do not describe what an Oboe stream can
     negotiate, and reporting them would mislead callers into probing.

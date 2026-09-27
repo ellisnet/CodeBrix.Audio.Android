@@ -58,6 +58,7 @@ public sealed class MainActivity : Activity
             string codec = extension;
             AddButton(panel, $"Decode / seek / play {codec.ToUpperInvariant()}", () => PlayFixture(codec));
         }
+        AddButton(panel, "Extract FLAC asset to storage, play by path", PlayMaterializedAsset);
         AddButton(panel, "Pause / resume", () => { if (_playback?.IsRunning == true) _playback.Stop(); else StartPlayback(); });
         AddButton(panel, "Seek file to start", () => { if (_voice is SoundPlayer player) { _playback?.Stop(); player.Seek(0); StartPlayback(); } });
         AddButton(panel, "Next output route", NextRoute);
@@ -115,6 +116,21 @@ public sealed class MainActivity : Activity
         var player = new SoundPlayer(_engine, AudioFormat.DvdHq, new RawDataProvider(samples.ToArray())) { IsLooping = true, Volume = 0.25f };
         player.Play(); ReplaceVoice(player);
         _status.Text = $"{codec}: decoded {samples.Count / 2} frames; seek passed; looping PCM playback.";
+    }
+    private void PlayMaterializedAsset()
+    {
+        // The route a packaged sample library takes on Android: the asset is copied out of the APK
+        // once per installed build and then opened by PATH, as the instrument libraries require.
+        bool wasMaterialized = AndroidPackagedAssets.IsMaterialized("tone.flac");
+        string path = AndroidPackagedAssets.Materialize("tone.flac");
+        using var file = File.OpenRead(path);
+        using var decoder = _engine.CreateDecoder(file, "flac", AudioFormat.DvdHq);
+        var block = new float[4096]; var samples = new List<float>();
+        int read;
+        while ((read = decoder.Decode(block)) > 0) samples.AddRange(block.AsSpan(0, read).ToArray());
+        var player = new SoundPlayer(_engine, AudioFormat.DvdHq, new RawDataProvider(samples.ToArray())) { IsLooping = true, Volume = 0.25f };
+        player.Play(); ReplaceVoice(player);
+        _status.Text = $"{(wasMaterialized ? "Reused" : "Extracted")} {path} ({new FileInfo(path).Length} bytes); playing from the file.";
     }
     private void StartCapture()
     {

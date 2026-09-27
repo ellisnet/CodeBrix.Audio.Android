@@ -25,14 +25,16 @@ samples/AudioDiagnostics/ - the physical-device diagnostics application
     package on a real phone or tablet: native-codec file playback (WAV, MP3,
     FLAC, Ogg Vorbis) plus Opus through the CodeBrix.Audio.Opus add-on, seek to
     start, pause/resume, ModestSynth workloads at 1, 32 and 128 simultaneous
-    voices, stepping through the output routes, microphone recording (up to ten
-    seconds) and replay, audio-focus handling, and audio / MIDI device
-    enumeration. A timer refreshes a metrics panel from IAndroidAudioDevice
-    .GetDiagnostics() twice a second: callback count, underruns, burst and
-    buffer sizes, the longest callback, bytes allocated inside callbacks, GC
-    counts and the last native or backend error. It pauses when it leaves the
-    foreground and provides no foreground service and no MediaProjection
-    consent UI, on purpose - those belong to a real application.
+    voices, extracting a packaged asset out of the APK with
+    AndroidPackagedAssets and playing it by path (the route a packaged sample
+    library takes), stepping through the output routes, microphone recording (up
+    to ten seconds) and replay, audio-focus handling, and audio / MIDI device
+    enumeration. A timer refreshes a metrics panel from
+    IAndroidAudioDevice.GetDiagnostics() twice a second: callback count,
+    underruns, burst and buffer sizes, the longest callback, bytes allocated
+    inside callbacks, GC counts and the last native or backend error. It pauses
+    when it leaves the foreground and provides no foreground service and no
+    MediaProjection consent UI, on purpose - those belong to a real application.
 
   WHY IT CONSUMES THE PACKAGE, NOT THE PROJECT
     It references CodeBrix.Audio.Android.ApacheLicenseForever as a NuGet package
@@ -140,7 +142,8 @@ tests/Assets/ - the audio fixtures
 tests/CodeBrix.Audio.Android.Tests/ - the test project
 ======================================================
   The only other non-package project in the solution, and the executable
-  documentation for the codec path and the MIDI byte parser. It runs on the
+  documentation for the codec path, the MIDI byte parser and the asset-stamp
+  logic behind AndroidPackagedAssets. It runs on the
   development host, not on Android; how and why is in MAINTAINER-README.txt,
   "TESTING". Its runtimes/linux-x64/native/ folder holds the committed host
   build of the codec library the codec tests load; those tests skip on any

@@ -91,7 +91,7 @@
     <Product>CodeBrix.Audio.Android</Product>
     <Title>CodeBrix.Audio.Android</Title>
     <Authors>Jeremy Ellis</Authors>
-    <Description>The Android platform package for CodeBrix.Audio: device playback and capture through Android's native low-latency audio path, native WAV, MP3, FLAC and Ogg Vorbis codecs, audio-focus and device-change helpers, and MIDI 1.0 ports, for .NET 10 Android applications on API level 33 and newer, ARM64 and x64. Reference it alongside CodeBrix.Audio.Core, and every existing CodeBrix.Audio playback, mixing, synthesis, effects and file API works on Android unchanged.</Description>
+    <Description>The Android platform package for CodeBrix.Audio: device playback and capture through Android's native low-latency audio path, native WAV, MP3, FLAC and Ogg Vorbis codecs, audio-focus and device-change helpers, MIDI 1.0 ports, and one-call extraction of packaged sample libraries out of the APK, for .NET 10 Android applications on API level 33 and newer, ARM64 and x64. Reference it alongside CodeBrix.Audio.Core, and every existing CodeBrix.Audio playback, mixing, synthesis, effects and file API works on Android unchanged.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Audio.Android</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Audio.Android</RepositoryUrl>

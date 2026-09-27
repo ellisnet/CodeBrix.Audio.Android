@@ -35,6 +35,11 @@ What this package adds on Android:
     inside callbacks).
   * MIDI 1.0 byte-stream input and output ports (USB, virtual and paired
     Bluetooth) through the engine's shared MIDI API.
+  * AndroidPackagedAssets: one call that copies a file or folder packaged as an
+    Android asset out of the APK into private storage, once per installed
+    build, and returns its path - the bridge between sample-library packages
+    that deliver a SoundFont, SFZ or Decent Sampler folder as FILES and an APK
+    that holds them only as assets.
 
 One call at start-up wires it in:
 
@@ -129,7 +134,7 @@ reference it.
 
 CORE API REFERENCE
 ==================
-Every public type in this package is listed here. There are six.
+Every public type in this package is listed here. There are seven.
 
 --------------------------------------------------------------------------------
 CodeBrixAndroidAudio  (static)  -  the start-up entry point
@@ -376,6 +381,66 @@ one, or install it on another engine with UseMidiBackend.
 USB permission prompts and Bluetooth discovery / pairing belong to the
 application and to Android; this backend only opens what Android already
 lists. MIDI 2.0 (UMP) ports are not exposed.
+
+--------------------------------------------------------------------------------
+AndroidPackagedAssets  (static)  -  packaged sample libraries, by path
+--------------------------------------------------------------------------------
+An instrument-library package delivers its samples as files and opens them by
+path. On desktop its build targets copy the files beside the executable. On
+Android the same files can only be packaged as ASSETS inside the APK, readable
+as streams, from no folder at all. This class turns an asset back into a file:
+it copies the asset into a private folder the first time, reuses that copy on
+every later launch, re-extracts after the application is updated, and returns
+the path for the instrument library to open.
+
+Every member takes an optional Context. Omit it after
+CodeBrixAndroidAudio.Initialize(context) has run - the application context
+retained there is used - and pass one otherwise (any context; only its
+ApplicationContext is used). Without either: InvalidOperationException.
+
+  static string Materialize(string assetPath, Context context = null)
+      Extracts the asset if no current copy exists and returns the copy's
+      absolute path. assetPath is the asset's path under the project's assets,
+      forward-slash, relative: a file ("FluidR3_GM.sf2", "instruments/x.sf2")
+      or a FOLDER, which is extracted with everything under it (an SFZ or
+      Decent Sampler set). Blocking file IO on a potentially large file: call
+      it from a background thread. FileNotFoundException when no such asset is
+      packaged (the message says to add it as an AndroidAsset item);
+      ArgumentException for an empty, absolute or ".."-escaping path.
+
+  static Task<string> MaterializeAsync(string assetPath,
+      IProgress<long> progress = null, CancellationToken cancellationToken =
+      default, Context context = null)
+      The same on a thread-pool thread. progress receives the bytes copied so
+      far - a running count, not a fraction, because the size of a compressed
+      asset is not known before it is read. Cancellation discards the partial
+      copy; nothing half-written is ever mistaken for a complete asset.
+
+  static bool IsMaterialized(string assetPath, Context context = null)
+      Whether a complete, CURRENT copy exists - current meaning stamped with
+      this installed build of the application.
+
+  static void Remove(string assetPath, Context context = null)
+  static void RemoveAll(Context context = null)
+      Delete one extracted copy, or all of them, to reclaim storage. The next
+      Materialize extracts again.
+
+  static string RootDirectory(Context context = null)
+      The folder the copies live in: a "codebrix-audio-assets" folder under
+      the application's private files directory. Copies mirror their asset
+      path beneath it, so two packages whose files share a name but sit in
+      different asset folders never collide.
+
+  HOW "CURRENT" IS DECIDED. Each copy carries a stamp with the application's
+  version code and its LastUpdateTime. Android changes LastUpdateTime on every
+  install, so a package update - or a developer redeploy with the same version
+  code - re-extracts, and an unchanged install never copies twice. The copy is
+  written under a temporary name and renamed into place only when complete,
+  so a crash or a cancellation mid-copy leaves nothing that passes as done.
+
+  STORAGE. An extracted asset exists twice on the device: compressed inside the
+  APK and copied out. That is the price of "open by path"; RemoveAll is the
+  way back when an application stops needing a library.
 
 --------------------------------------------------------------------------------
 THE SERVICE LOOP
@@ -648,7 +713,33 @@ Example 7 - Reading diagnostics on a timer
     }, null, 1000, 1000);
 
 --------------------------------------------------------------------------------
-Example 8 - MIDI in and out through the engine
+Example 8 - A packaged SoundFont library on Android
+--------------------------------------------------------------------------------
+The application references an instrument package (here CodeBrix.Audio.Samples
+.FluidR3Gm, which ships its SoundFont in the package) and packs the file as an
+Android asset - a package that ships the file adds that item through its own
+build targets, otherwise it is one line in the application's csproj:
+
+    <ItemGroup>
+      <AndroidAsset Include="FluidR3_GM.sf2" />
+    </ItemGroup>
+
+Then, once, on a background thread:
+
+    using CodeBrix.Audio.Android;
+    using CodeBrix.Audio.Samples.FluidR3Gm;
+
+    var path = await AndroidPackagedAssets.MaterializeAsync("FluidR3_GM.sf2",
+        new Progress<long>(bytes => ShowProgress(bytes)));
+    FluidR3GmInstrumentLibrary.UseSoundFontAt(path);   // the explicit override
+    FluidR3GmInstrumentLibrary.Register();
+
+Every later launch returns the existing copy immediately. A folder-based
+library is the same call with the asset FOLDER's path, and the library is then
+pointed at the folder (or a file inside it) that comes back.
+
+--------------------------------------------------------------------------------
+Example 9 - MIDI in and out through the engine
 --------------------------------------------------------------------------------
     using CodeBrix.Audio.Android;
 
@@ -811,6 +902,14 @@ COMMON PITFALLS TO AVOID
   - BLOCKING IN A MIDI SUBSCRIBER. Subscribers run on Android's MIDI delivery
     thread; an exception there is captured in LastReceiveError and the parser
     state stays consistent, but slow work there delays every later message.
+  - EXTRACTING A SAMPLE LIBRARY ON THE UI THREAD. AndroidPackagedAssets
+    .Materialize copies what may be a very large file; call it from a
+    background thread or use MaterializeAsync. And extract BEFORE registering
+    the instrument library, not inside a render callback.
+  - EXPECTING AN INSTRUMENT PACKAGE'S DESKTOP DELIVERY TO WORK ON ANDROID. A
+    package that lands its files beside the executable through copy-to-output
+    puts nothing in an APK. The file has to be an AndroidAsset, extracted with
+    AndroidPackagedAssets, and the library told the path.
   - NOTHING PAUSES FOR YOU when the activity goes to the background. Without
     a foreground service, stop in OnStop; with one, keep playing and make
     sure the service and notification meet the platform's requirements.
@@ -841,6 +940,10 @@ WHAT THIS PACKAGE DOES NOT DO
     audio.
   - It does not expose the native library's own API. Everything is reached
     through CodeBrix.Audio's engine abstractions.
+  - It does not, yet, tell an instrument library where its extracted file is
+    by itself: the application hands the path from AndroidPackagedAssets to
+    the library's own "use the file at this path" call. That hand-off is what
+    a coming CodeBrix.Audio.Core seam removes.
 
 
 WORKING EXAMPLES ON GITHUB
@@ -871,6 +974,10 @@ the test project covers what can run on a development machine.
                             mid-file, that the codec-only library exports no
                             device symbols, and WAV encoding that decodes back
                             to the input.
+  AssetStampTests.cs        The platform-neutral half of AndroidPackagedAssets:
+                            asset-path validation (relative, forward-slash,
+                            nothing that escapes), the on-disk layout of a
+                            copy, and the per-install stamp.
   MidiByteParserTests.cs    The MIDI byte parser behind AndroidMidiBackend:
                             running status, fragmentation across callbacks,
                             real-time bytes interleaved inside SysEx, system-
@@ -915,6 +1022,12 @@ QUICK REFERENCE CARD
             CallbackException CallbackAllocatedBytes
             MaximumCallbackMicroseconds   (managed: device lifetime)
 
+  ASSETS    AndroidPackagedAssets.Materialize("FluidR3_GM.sf2")   -> path
+            .MaterializeAsync(path, progress, token)   background thread
+            .IsMaterialized(path)  .Remove(path)  .RemoveAll()  .RootDirectory()
+            files OR folders; extracted once per installed build; then
+            FluidR3GmInstrumentLibrary.UseSoundFontAt(path)
+
   MIDI      new AndroidMidiBackend(context)   (the engine makes one itself)
             .UpdateMidiDevicesInfo(out inputs, out outputs)
             .CreateMidiInputDevice(info)  .CreateMidiOutputDevice(info)
@@ -935,4 +1048,5 @@ QUICK REFERENCE CARD
     AndroidAudioDiagnostics  readonly record struct snapshot
     IAndroidAudioDevice      GetDiagnostics() on playback / capture devices
     AndroidMidiBackend       IMidiBackend for MIDI 1.0 byte-stream ports
+    AndroidPackagedAssets    packaged assets out of the APK, by path
 ================================================================================
