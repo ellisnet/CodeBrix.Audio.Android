@@ -119,10 +119,15 @@ REPOSITORY LAYOUT
       BUILD-PROVENANCE.txt        toolchain + hashes of the shipped binaries,
                                   written by tools/verify-native.py
   tests/CodeBrix.Audio.Android.Tests/   the xUnit v3 HOST test project
+      runtimes/linux-x64/native/libcodebrix_miniaudio.so
+                                  the COMMITTED host build of the codec half
+                                  of native/, for the codec tests (see
+                                  TESTING); refreshed by tools/test-host.sh
   tests/Assets/                   audio fixtures + PROVENANCE.txt
   samples/AudioDiagnostics/       the physical-device diagnostics app
   tools/                          build / test / verify scripts (EXTRAS-README)
-  artifacts/                      build output, git-ignored
+  artifacts/                      build output, git-ignored; nothing the
+                                  solution needs lives here
   CodeBrix.Audio.Android.slnx     the solution. Its Solution Items folder
                                   carries .gitignore, AGENT-README.txt,
                                   EXTRAS-README.txt, global.json,
@@ -205,21 +210,36 @@ pins back to a PUBLISHED Core version before releasing anything.
 TESTING
 =======
 The tests are HOST tests: they run on the development machine, not on Android.
-Run them with the one script that also builds what they need:
-
-    bash tools/test-host.sh
-
-It configures and builds the codec-only variant of the native sources
-(CODEBRIX_CODECS_ONLY=ON: codecs.c alone, no Oboe, no NDK) into
-artifacts/native/host/libcodebrix_miniaudio.so, then runs
 
     dotnet test -c Release --project \
         tests/CodeBrix.Audio.Android.Tests/CodeBrix.Audio.Android.Tests.csproj
 
-Extra arguments to the script are passed to dotnet test (for example a
--p:RestoreSources= pointing at a local feed during a coordinated build). A bare
-`dotnet test CodeBrix.Audio.Android.slnx` will FAIL until the host library has
-been built once; that is expected, and it is why the script exists.
+That works from a fresh clone on any platform, because everything the tests
+need is committed. The codec tests exercise a HOST build of the codec half of
+native/ (CODEBRIX_CODECS_ONLY=ON: codecs.c alone, no Oboe, no NDK), and that
+build is committed under the test project at
+
+    tests/CodeBrix.Audio.Android.Tests/runtimes/linux-x64/native/libcodebrix_miniaudio.so
+
+which the csproj copies into the output under runtimes/<rid>/native/, the
+layout Core's DllImportResolver probes. It is LINUX x64 ONLY, by decision: a
+codebrix_miniaudio.dll or .dylib would exist only to run these tests on Windows
+or macOS, and that is not worth a second and third native build. So the codec
+tests call Assert.SkipUnless for Linux x64 and SKIP everywhere else, while the
+MIDI parser tests run on every platform. The committed .so was compiled on the
+development workstation and carries its glibc floor, which is fine for a test
+helper (it is never shipped) but means a much older Linux would fail to load it.
+
+When anything under native/ changes, refresh that committed library and commit
+the new file alongside the change - the same rule the family applies to every
+committed native binary:
+
+    bash tools/test-host.sh
+
+It builds into the git-ignored artifacts/native/host/, copies the result to the
+committed location, and then runs the tests. Extra arguments are passed to
+dotnet test (for example a -p:RestoreSources= pointing at a local feed during a
+coordinated build). It refuses to run anywhere but Linux x64.
 
 THE TEST RUNNER IS Microsoft.Testing.Platform (MTP), selected by global.json at
 the repo root: { "test": { "runner": "Microsoft.Testing.Platform" } }. That is
@@ -234,6 +254,8 @@ Why the test project looks the way it does:
     linked file.
   - It references the pinned Core package directly, because the codec tests go
     through Core's MiniAudioCodecFactory against the host native library.
+    Core ships no native code of its own, so nothing collides with the
+    committed host build under runtimes/.
   - Test dependencies are Microsoft.NET.Test.Sdk, xunit.v3,
     xunit.runner.visualstudio and SilverAssertions.ApacheLicenseForever. No
     coverage collector is referenced.
@@ -307,8 +329,9 @@ PUBLISH CHECKLIST (Jeremy publishes; nothing here pushes to nuget.org):
   1. The Core pin in the library csproj names a version that is ON NUGET.ORG.
   2. native/ unchanged since the committed binaries were built - or rebuilt
      with tools/build-native.sh and BUILD-PROVENANCE.txt updated and committed.
-  3. `bash tools/test-host.sh` passes; the sibling suites pass against the
-     Core version pinned.
+  3. `bash tools/test-host.sh` passes, and the host library it refreshed is
+     committed (it only changes when native/ changed); the sibling suites pass
+     against the Core version pinned.
   4. `dotnet build src/CodeBrix.Audio.Android/CodeBrix.Audio.Android.csproj
      -c Release` with 0 warnings / 0 errors. Take the .nupkg from bin/Release.
   5. Push the package; then set samples/AudioDiagnostics's AndroidAudioVersion
@@ -390,9 +413,10 @@ The family conventions apply in full:
     null-forgiveness `!` operator; value-type nullables (int?, bool?) are
     fine - and DeviceInfo is a STRUCT in the Engine, so the `DeviceInfo?`
     parameters on the device-opening and switching methods are Nullable<T>,
-    not annotations, and stay. The Engine abstractions this backend implements and the Android
-    bindings it calls are nullable-annotated on their side; overriding them
-    without annotations is legal and is the family's way. When a binding
+    not annotations, and stay. The Engine abstractions this backend
+    implements and the Android bindings it calls are nullable-annotated on
+    their side; overriding them without annotations is legal and is the
+    family's way. When a binding
     member can return null (Looper.MainLooper, the Android builders' Set...
     methods, GetSystemService), the code either guards with a throw or
     accepts the null at run time - it never asserts it away.

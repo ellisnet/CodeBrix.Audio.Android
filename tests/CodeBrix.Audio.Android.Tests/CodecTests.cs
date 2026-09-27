@@ -10,10 +10,18 @@ using Xunit;
 namespace CodeBrix.Audio.Android.Tests;
 
 // Exercises the codec half of the native library through a HOST build of the same C
-// sources (artifacts/native/host/libcodebrix_miniaudio.so, built by tools/test-host.sh),
-// via the shared engine's codec factory. Nothing here touches Android's device stack.
+// sources, committed at runtimes/linux-x64/native/libcodebrix_miniaudio.so and built by
+// tools/test-host.sh, via the shared engine's codec factory. Nothing here touches
+// Android's device stack. Linux x64 only: that is the one host build committed, so on
+// any other platform every test in this class skips rather than fails.
 public sealed class CodecTests
 {
+    private const string HostLibraryRelativePath = "runtimes/linux-x64/native/libcodebrix_miniaudio.so";
+
+    private static void SkipUnlessHostLibraryPlatform()
+        => Assert.SkipUnless(OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64,
+            "The host codec library is committed for linux-x64 only; these tests run there and skip elsewhere.");
+
     [Theory]
     [InlineData("tone.wav", "wav")]
     [InlineData("tone.mp3", "mp3")]
@@ -22,6 +30,7 @@ public sealed class CodecTests
     public void codec_only_binary_decodes_resamples_and_seeks_without_device_io(string file, string format)
     {
         //Arrange
+        SkipUnlessHostLibraryPlatform();
         using var input = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Assets", file));
         var factory = new MiniAudioCodecFactory();
         using var decoder = factory.CreateDecoder(input, format, AudioFormat.DvdHq);
@@ -52,7 +61,8 @@ public sealed class CodecTests
     public void host_library_contains_vorbis_and_no_miniaudio_devices()
     {
         //Arrange
-        var library = NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "libcodebrix_miniaudio.so"));
+        SkipUnlessHostLibraryPlatform();
+        var library = NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, HostLibraryRelativePath));
         try
         {
             //Act
@@ -72,6 +82,7 @@ public sealed class CodecTests
     public void codec_only_encoder_writes_readable_wav()
     {
         //Arrange
+        SkipUnlessHostLibraryPlatform();
         var factory = new MiniAudioCodecFactory();
         using var bytes = new MemoryStream();
         var signal = Enumerable.Range(0, 960).Select(i => (float)(0.1 * Math.Sin(i * 0.07))).ToArray();

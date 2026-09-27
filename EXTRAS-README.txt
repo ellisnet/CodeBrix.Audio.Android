@@ -92,12 +92,15 @@ tools/ - build, test and verification scripts
       it. Run it from anywhere; it locates the repository itself.
 
   tools/test-host.sh
-      Configures and builds the codec-only HOST variant of the same native
-      sources (CODEBRIX_CODECS_ONLY=ON, no Android toolchain, no device code)
-      into artifacts/native/host/, then runs the test project in Release. Extra
-      arguments are passed to `dotnet test` (for example a -p:RestoreSources=
-      override). This is the one command that runs the tests; see
-      MAINTAINER-README.txt, "TESTING".
+      Rebuilds the codec-only HOST variant of the same native sources
+      (CODEBRIX_CODECS_ONLY=ON, no Android toolchain, no device code) in
+      artifacts/native/host/, copies the result to its COMMITTED home,
+      tests/CodeBrix.Audio.Android.Tests/runtimes/linux-x64/native/, and then
+      runs the test project in Release. Extra arguments are passed to
+      `dotnet test` (for example a -p:RestoreSources= override). Linux x64
+      only. Run it after any change under native/ and commit the refreshed
+      .so; for merely RUNNING the tests, plain `dotnet test` is enough, since
+      the library is committed. See MAINTAINER-README.txt, "TESTING".
 
   tools/build-local.sh <version>
       The coordinated-change path: builds the sibling CodeBrix.Audio and
@@ -139,14 +142,19 @@ tests/CodeBrix.Audio.Android.Tests/ - the test project
   The only other non-package project in the solution, and the executable
   documentation for the codec path and the MIDI byte parser. It runs on the
   development host, not on Android; how and why is in MAINTAINER-README.txt,
-  "TESTING". Run it with:
+  "TESTING". Its runtimes/linux-x64/native/ folder holds the committed host
+  build of the codec library the codec tests load; those tests skip on any
+  platform other than Linux x64, the MIDI parser tests run everywhere. Run it
+  with:
 
-      bash tools/test-host.sh
+      dotnet test CodeBrix.Audio.Android.slnx
 
 
 artifacts/ - build output (ignored by git)
 ==========================================
   Native CMake build trees (artifacts/native/<abi>/ and artifacts/native/host/)
-  and any verification reports the tools write. Safe to delete at any time;
+  and any verification reports the tools write. Nothing the solution builds or
+  tests with lives here - the finished binaries are copied out to their
+  committed homes under src/ and tests/. Safe to delete at any time;
   tools/build-native.sh and tools/test-host.sh recreate what they need.
 ================================================================================
