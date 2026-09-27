@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using CodeBrix.Audio.Android.Internal;
 using CodeBrix.Audio.Engine.Abstracts;
 using CodeBrix.Audio.Engine.Interfaces;
@@ -36,13 +41,13 @@ public sealed class AndroidMidiBackend : IMidiBackend
     public AndroidMidiBackend(Context context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _manager = (global::Android.Media.Midi.MidiManager?)context.ApplicationContext?.GetSystemService(Context.MidiService)
+        _manager = (global::Android.Media.Midi.MidiManager)context.ApplicationContext?.GetSystemService(Context.MidiService)
             ?? throw new PlatformNotSupportedException("Android MIDI is unavailable on this device.");
         _thread = new HandlerThread("CodeBrix MIDI control"); _thread.Start();
-        _handler = new Handler(_thread.Looper!);
+        _handler = new Handler(_thread.Looper);
     }
     /// <summary>The most recent receive/parser or subscriber failure, captured outside JNI.</summary>
-    public Exception? LastReceiveError { get; private set; }
+    public Exception LastReceiveError { get; private set; }
     /// <inheritdoc />
     public void Initialize(AudioEngine engine) { ArgumentNullException.ThrowIfNull(engine); }
     /// <inheritdoc />
@@ -125,8 +130,8 @@ public sealed class AndroidMidiBackend : IMidiBackend
     }
     private sealed class OpenListener : Java.Lang.Object, global::Android.Media.Midi.MidiManager.IOnDeviceOpenedListener
     {
-        internal readonly TaskCompletionSource<NativeMidiDevice?> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public void OnDeviceOpened(NativeMidiDevice? device)
+        internal readonly TaskCompletionSource<NativeMidiDevice> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void OnDeviceOpened(NativeMidiDevice device)
         {
             if (!Completion.TrySetResult(device)) { device?.Close(); device?.Dispose(); }
             Dispose();
@@ -154,7 +159,7 @@ public sealed class AndroidMidiBackend : IMidiBackend
     }
     private sealed class Receiver(MidiByteParser parser, Action<Exception> error) : MidiReceiver
     {
-        public override void OnSend(byte[]? msg, int offset, int count, long timestamp)
+        public override void OnSend(byte[] msg, int offset, int count, long timestamp)
         {
             if (msg == null) return;
             try { parser.Feed(msg.AsSpan(offset, count), timestamp); }

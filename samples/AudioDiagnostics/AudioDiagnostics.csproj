@@ -7,13 +7,17 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <!-- AndroidAudioVersion: the published CodeBrix.Audio.Android package. Until it is on nuget.org,
-         pass the locally packed version and a local feed on the command line (see DEVELOPMENT.md). -->
+         pass the locally packed version and a local feed on the command line (see MAINTAINER-README.txt, "SAMPLES"). -->
     <AndroidAudioVersion Condition="'$(AndroidAudioVersion)' == ''">1.0.269.1101</AndroidAudioVersion>
+  </PropertyGroup>
+  <!-- SDK / JDK defaults for this machine, same rule as the library csproj: used only when
+       nothing else set them; override with -p:AndroidSdkDirectory=... -p:JavaSdkDirectory=...
+       or ANDROID_HOME / JAVA_HOME. -->
+  <PropertyGroup>
+    <_CodeBrixUserAndroidSdk>$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))/Android/Sdk</_CodeBrixUserAndroidSdk>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('$(_CodeBrixUserAndroidSdk)')">$(_CodeBrixUserAndroidSdk)</AndroidSdkDirectory>
     <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-amd64')">/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
-    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('/home/jeremy/Android/Sdk')">/home/jeremy/Android/Sdk</AndroidSdkDirectory>
   </PropertyGroup>
   <ItemGroup>
     <!-- Deliberately test the packed Android artifact, including its native AAR. -->

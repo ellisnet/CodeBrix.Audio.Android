@@ -1,3 +1,4 @@
+using System;
 using CodeBrix.Audio.Engine.Abstracts.Devices;
 using CodeBrix.Audio.Engine.Enums;
 using CodeBrix.Audio.Engine.Structs;
@@ -61,7 +62,7 @@ internal sealed class AndroidCaptureDevice : AudioCaptureDevice, IAndroidAudioDe
             }
             try { ((AndroidAudioEngine)Engine).EnsureRecordPermission(); }
             catch { _stream.Stop(); IsRunning = false; throw; }
-            if (diagnostics.NativeError != 0 && !((AndroidDeviceConfig)Config!).RecoverDisconnectedStreams)
+            if (diagnostics.NativeError != 0 && !((AndroidDeviceConfig)Config).RecoverDisconnectedStreams)
             {
                 _stream.Stop(); IsRunning = false;
                 throw new InvalidOperationException($"Capture disconnected with native error {diagnostics.NativeError}; automatic recovery is disabled.");

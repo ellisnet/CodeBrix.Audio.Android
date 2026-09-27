@@ -1,6 +1,8 @@
+using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using CodeBrix.Audio.Engine.Abstracts;
 using CodeBrix.Audio.Engine.Enums;
 using CodeBrix.Audio.Engine.Structs;
@@ -16,7 +18,7 @@ internal sealed unsafe class OboeStream : IDisposable
     private readonly AndroidDeviceConfig _config;
     private readonly object _gate = new();
     private StreamHandle _handle;
-    private Exception? _callbackException;
+    private Exception _callbackException;
     private long _allocatedBytes;
     private long _maxTicks;
     private bool _disposed;

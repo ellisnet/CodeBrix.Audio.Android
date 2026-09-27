@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-sdk=${ANDROID_SDK_ROOT:-/home/jeremy/Android/Sdk}
+sdk=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}
 ndk=${CODEBRIX_ANDROID_NDK:-$sdk/ndk/30.0.16248370}
 test -f "$ndk/build/cmake/android.toolchain.cmake" || { echo "NDK missing: $ndk" >&2; exit 1; }
 python3 "$repo/tools/verify-vendor.py"

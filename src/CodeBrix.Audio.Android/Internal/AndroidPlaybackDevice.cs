@@ -1,3 +1,4 @@
+using System;
 using CodeBrix.Audio.Engine.Abstracts.Devices;
 using CodeBrix.Audio.Engine.Enums;
 using CodeBrix.Audio.Engine.Structs;
@@ -66,7 +67,7 @@ internal sealed class AndroidPlaybackDevice : AudioPlaybackDevice, IAndroidAudio
                 _stream.Stop(); IsRunning = false;
                 throw new InvalidOperationException("The playback callback failed; playback has stopped.", diagnostics.CallbackException);
             }
-            if (diagnostics.NativeError != 0 && !((AndroidDeviceConfig)Config!).RecoverDisconnectedStreams)
+            if (diagnostics.NativeError != 0 && !((AndroidDeviceConfig)Config).RecoverDisconnectedStreams)
             {
                 _stream.Stop(); IsRunning = false;
                 throw new InvalidOperationException($"Playback disconnected with native error {diagnostics.NativeError}; automatic recovery is disabled.");

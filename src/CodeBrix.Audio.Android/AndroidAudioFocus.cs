@@ -1,3 +1,4 @@
+using System;
 using global::Android.Content;
 using global::Android.Media;
 using global::Android.OS;
@@ -23,17 +24,17 @@ public sealed class AndroidAudioFocus : IDisposable
     public AndroidAudioFocus(Context context, AudioUsageKind usage = AudioUsageKind.Media, AudioFocus gain = AudioFocus.Gain)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _manager = (AudioManager?)context.ApplicationContext?.GetSystemService(Context.AudioService)
+        _manager = (AudioManager)context.ApplicationContext?.GetSystemService(Context.AudioService)
             ?? throw new PlatformNotSupportedException("Android AudioManager is unavailable.");
-        _listener = new Listener(this); _handler = new Handler(Looper.MainLooper!);
+        _listener = new Listener(this); _handler = new Handler(Looper.MainLooper);
         using var attributesBuilder = new AudioAttributes.Builder();
-        using var attributes = attributesBuilder.SetUsage(usage)!.SetContentType(AudioContentType.Music)!.Build()!;
+        using var attributes = attributesBuilder.SetUsage(usage).SetContentType(AudioContentType.Music).Build();
         using var requestBuilder = new AudioFocusRequestClass.Builder(gain);
-        _request = requestBuilder.SetAudioAttributes(attributes)!.SetAcceptsDelayedFocusGain(false)!
-            .SetOnAudioFocusChangeListener(_listener, _handler)!.Build()!;
+        _request = requestBuilder.SetAudioAttributes(attributes).SetAcceptsDelayedFocusGain(false)
+            .SetOnAudioFocusChangeListener(_listener, _handler).Build();
     }
     /// <summary>Raised on Android's main thread. The application decides how to react.</summary>
-    public event Action<AudioFocus>? FocusChanged;
+    public event Action<AudioFocus> FocusChanged;
     /// <summary>Requests focus. A denied request must not be treated as permission to play.</summary>
     /// <returns>True when Android granted focus.</returns>
     public bool Request()

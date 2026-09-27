@@ -14,7 +14,7 @@ sources="-p:RestoreSources=$feed%3Bhttps://api.nuget.org/v3/index.json"
 for project in \
     "$opus/src/CodeBrix.Audio.Opus/CodeBrix.Audio.Opus.csproj" \
     "$repo/src/CodeBrix.Audio.Android/CodeBrix.Audio.Android.csproj" \
-    "$repo/tests/CodeBrix.Audio.Android.HostTests/CodeBrix.Audio.Android.HostTests.csproj"; do
+    "$repo/tests/CodeBrix.Audio.Android.Tests/CodeBrix.Audio.Android.Tests.csproj"; do
     grep -q "Include=\"CodeBrix.Audio.Core.MitLicenseForever\" Version=\"$version\"" "$project" \
         || { echo "Raise the CodeBrix.Audio.Core.MitLicenseForever pin to $version in $project first." >&2; exit 1; }
 done

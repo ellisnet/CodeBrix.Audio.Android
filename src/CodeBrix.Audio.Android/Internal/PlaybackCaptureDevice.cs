@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Threading;
 using CodeBrix.Audio.Engine.Abstracts.Devices;
 using CodeBrix.Audio.Engine.Enums;
 using global::Android.Media;
@@ -11,9 +14,9 @@ internal sealed class PlaybackCaptureDevice : AudioCaptureDevice, IServiceDevice
     private readonly AudioRecord _record;
     private readonly float[] _buffer;
     private readonly object _gate = new();
-    private Thread? _thread;
+    private Thread _thread;
     private int _run;
-    private Exception? _failure;
+    private Exception _failure;
 
     internal PlaybackCaptureDevice(AndroidAudioEngine engine, MediaProjection projection, AudioFormat format, AndroidDeviceConfig config)
         : base(engine, format, config)
@@ -22,18 +25,18 @@ internal sealed class PlaybackCaptureDevice : AudioCaptureDevice, IServiceDevice
         Capability = Capability.Loopback;
         var mask = format.Channels == 1 ? ChannelIn.Mono : ChannelIn.Stereo;
         using var captureBuilder = new AudioPlaybackCaptureConfiguration.Builder(projection);
-        using var capture = captureBuilder.AddMatchingUsage(AudioUsageKind.Media)!
-            .AddMatchingUsage(AudioUsageKind.Game)!.AddMatchingUsage(AudioUsageKind.Unknown)!.Build()!;
+        using var capture = captureBuilder.AddMatchingUsage(AudioUsageKind.Media)
+            .AddMatchingUsage(AudioUsageKind.Game).AddMatchingUsage(AudioUsageKind.Unknown).Build();
         using var formatBuilder = new global::Android.Media.AudioFormat.Builder();
-        using var audioFormat = formatBuilder.SetEncoding(Encoding.PcmFloat)!
-            .SetSampleRate(format.SampleRate)!.SetChannelMask((ChannelOut)(int)mask)!.Build()!;
+        using var audioFormat = formatBuilder.SetEncoding(Encoding.PcmFloat)
+            .SetSampleRate(format.SampleRate).SetChannelMask((ChannelOut)(int)mask).Build();
         int minimum = AudioRecord.GetMinBufferSize(format.SampleRate, mask, Encoding.PcmFloat);
         if (minimum <= 0) throw new NotSupportedException("Android cannot capture the requested format.");
         int frames = Math.Max(format.SampleRate / 100, (minimum + 4 * format.Channels - 1) / (4 * format.Channels));
         _buffer = new float[frames * format.Channels];
         using var builder = new AudioRecord.Builder();
-        _record = builder.SetAudioPlaybackCaptureConfig(capture)!.SetAudioFormat(audioFormat)!
-            .SetBufferSizeInBytes(_buffer.Length * sizeof(float) * 2)!.Build()!;
+        _record = builder.SetAudioPlaybackCaptureConfig(capture).SetAudioFormat(audioFormat)
+            .SetBufferSizeInBytes(_buffer.Length * sizeof(float) * 2).Build();
         if (_record.State != State.Initialized)
         {
             _record.Dispose();

@@ -1,3 +1,5 @@
+using System;
+
 namespace CodeBrix.Audio.Android;
 
 /// <summary>A snapshot collected outside the audio callback. Counts reset when a stream reopens.</summary>
@@ -11,7 +13,7 @@ namespace CodeBrix.Audio.Android;
 /// <param name="CallbackAllocatedBytes">Managed allocations observed inside callbacks.</param>
 /// <param name="MaximumCallbackMicroseconds">Longest observed callback time.</param>
 public readonly record struct AndroidAudioDiagnostics(long CallbackCount, int XRunCount,
-    int FramesPerBurst, int BufferFrames, int DeviceId, int NativeError, Exception? CallbackException,
+    int FramesPerBurst, int BufferFrames, int DeviceId, int NativeError, Exception CallbackException,
     long CallbackAllocatedBytes, double MaximumCallbackMicroseconds);
 
 /// <summary>Implemented by Android devices that expose callback and hardware diagnostics.</summary>

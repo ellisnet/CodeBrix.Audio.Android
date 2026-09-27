@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using CodeBrix.Audio.Engine.Midi.Structs;
 
 namespace CodeBrix.Audio.Android.Internal;
@@ -10,7 +13,7 @@ internal sealed class MidiByteParser(Action<MidiMessage> message, Action<byte[]>
     private byte _first;
     private int _received;
     private int _needed;
-    private List<byte>? _sysex;
+    private List<byte> _sysex;
     internal void Feed(ReadOnlySpan<byte> bytes, long timestamp)
     {
         foreach (byte value in bytes)

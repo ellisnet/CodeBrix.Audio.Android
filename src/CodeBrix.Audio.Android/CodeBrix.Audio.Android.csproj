@@ -1,22 +1,79 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    CodeBrix.Audio.Android - the Android platform package for CodeBrix.Audio: device
+    playback and capture through Android's native low-latency audio path, native WAV /
+    MP3 / FLAC / Ogg Vorbis codecs, audio-focus and device-change helpers, and MIDI 1.0
+    ports, all for the shared managed engine that ships in
+    CodeBrix.Audio.Core.MitLicenseForever. Full provenance of the native sources under
+    native/vendor/ is in THIRD-PARTY-NOTICES.txt at the repo root.
+
+    SITUATIONAL SETTINGS - documented here so they are not mistaken for oversights:
+
+      * AllowUnsafeBlocks is required by the native interop: the audio callback is an
+        unmanaged function pointer, and the sample buffers are spans over native memory.
+      * The target framework is net10.0-android36.1, not net10.0. This is a platform
+        package and can only be referenced by an Android application project; the test
+        project therefore cannot ProjectReference it (see MAINTAINER-README.txt, "TESTING").
+
+    Everything else is the family standard: nullable reference types OFF (reference
+    types are always nullable; the source carries no `?` annotations and no `!`), no
+    ImplicitUsings (every file lists its usings), no NoWarn.
+  -->
+
   <PropertyGroup>
     <TargetFramework>net10.0-android36.1</TargetFramework>
     <SupportedOSPlatformVersion>33.0</SupportedOSPlatformVersion>
     <AssemblyName>CodeBrix.Audio.Android</AssemblyName>
     <RootNamespace>CodeBrix.Audio.Android</RootNamespace>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-amd64')">/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
-    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('/home/jeremy/Android/Sdk')">/home/jeremy/Android/Sdk</AndroidSdkDirectory>
   </PropertyGroup>
 
   <!--
-    Package / assembly version: date-stamped and auto-incrementing, 1.<years since 2026>.<day of
-    year>.<minute of day>, every field from UTC "now". Strictly increasing; a fresh version on every
-    build; two builds in the same UTC minute share one. A BuildVersion passed on the command line
-    (tools/build-local.sh does this) is a global property and wins over the value computed here.
+    Where the Android SDK and a JDK live on this machine, used only when the standard
+    properties are not already set by the environment, the command line or the workload.
+    The defaults are where the Android workload's own setup puts things on a Debian
+    workstation: the SDK under the user's home directory, and the distribution's JDK 21
+    (the system default Java may be newer than the workload accepts). On a machine laid out
+    differently, pass -p:AndroidSdkDirectory=... -p:JavaSdkDirectory=... to dotnet, or set
+    the ANDROID_HOME / JAVA_HOME environment variables the workload honours.
+  -->
+  <PropertyGroup>
+    <_CodeBrixUserAndroidSdk>$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))/Android/Sdk</_CodeBrixUserAndroidSdk>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('$(_CodeBrixUserAndroidSdk)')">$(_CodeBrixUserAndroidSdk)</AndroidSdkDirectory>
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/usr/lib/jvm/java-21-openjdk-amd64')">/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
+  </PropertyGroup>
+
+  <!--
+    Package / assembly version: date-stamped and auto-incrementing.
+
+    Format:  1.<x>.<y>.<z>   (every field is derived from UTC "now")
+
+      1  (major)     Always 1 for this library.
+      x  (minor)     Whole years since $(_VersionBaseYear).
+                     With base 2026: 2026=0, 2027=1, 2028=2, ...
+      y  (build)     Day of year, 1-based inclusive, UTC.
+                     Jan 1 = 1, Feb 1 = 32, Dec 31 = 365 (366 in a leap year).
+      z  (revision)  Minute of day, UTC, range 0 to 1439.
+                     00:00 = 0, 23:59 = 1439.
+
+    The version is always strictly increasing over time:
+      * within a day, z grows;
+      * at a day boundary, y increments and outranks z resetting to 0;
+      * at a (UTC) year boundary, x increments and outranks y and z resetting.
+
+    Notes / caveats:
+      * All fields read from System.DateTime.UtcNow, so a local dev build and a
+        UTC CI build agree on the value. Math.Floor on the minutes keeps z in
+        0..1439 (plain rounding could land on 1440 late in the day).
+      * Because the value depends on the clock, every build produces a NEW
+        version. With GeneratePackageOnBuild=true that means a fresh .nupkg on
+        each build, and two builds in the SAME UTC minute produce the SAME
+        version (so do not publish two packages from within one minute).
+      * This is date-stamp versioning, not SemVer: minor encodes the year and
+        major is pinned to 1, so major/minor do not signal API compatibility.
+      * To re-baseline the minor number, change _VersionBaseYear below.
   -->
   <PropertyGroup>
     <_VersionBaseYear>2026</_VersionBaseYear>
@@ -24,30 +81,51 @@
     <_VersionDayOfYear>$([System.DateTime]::UtcNow.DayOfYear)</_VersionDayOfYear>
     <_VersionMinuteOfDay>$([System.Convert]::ToInt32($([System.Math]::Floor($([System.DateTime]::UtcNow.TimeOfDay.TotalMinutes)))))</_VersionMinuteOfDay>
     <BuildVersion Condition="'$(BuildVersion)' == ''">1.$(_VersionYears).$(_VersionDayOfYear).$(_VersionMinuteOfDay)</BuildVersion>
+    <Version>$(BuildVersion)</Version>
+    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(BuildVersion)</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup>
     <PackageId>CodeBrix.Audio.Android.ApacheLicenseForever</PackageId>
-    <Version>$(BuildVersion)</Version>
-    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
-    <FileVersion>$(BuildVersion)</FileVersion>
+    <Product>CodeBrix.Audio.Android</Product>
+    <Title>CodeBrix.Audio.Android</Title>
     <Authors>Jeremy Ellis</Authors>
+    <Description>The Android platform package for CodeBrix.Audio: device playback and capture through Android's native low-latency audio path, native WAV, MP3, FLAC and Ogg Vorbis codecs, audio-focus and device-change helpers, and MIDI 1.0 ports, for .NET 10 Android applications on API level 33 and newer, ARM64 and x64. Reference it alongside CodeBrix.Audio.Core, and every existing CodeBrix.Audio playback, mixing, synthesis, effects and file API works on Android unchanged.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <Description>Native Oboe playback and capture with miniaudio codecs for CodeBrix.Audio on .NET 10 Android, API 33 and newer, ARM64 and x64.</Description>
+    <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Audio.Android</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Audio.Android</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>icon-codebrix-128.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <IsPackable>true</IsPackable>
+    <PackageTags>android;audio;playback;capture;recording;midi;codec;wav;mp3;flac;vorbis;CodeBrix</PackageTags>
   </PropertyGroup>
+
   <ItemGroup>
     <!-- THE ONE PLACE the Core version lives. It must be a PUBLISHED version on nuget.org whenever this
-         package is published; the host-test and sample csproj files carry the same number. -->
+         package is published; the test and sample csproj files carry the same number. -->
     <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.269.1270" />
-    <AndroidNativeLibrary Include="native/arm64-v8a/libcodebrix_miniaudio.so" Abi="arm64-v8a" />
-    <AndroidNativeLibrary Include="native/x86_64/libcodebrix_miniaudio.so" Abi="x86_64" />
-    <None Include="../../README.md;../../AGENT-README.txt;../../LICENSE;../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built by tools/build-native.sh from native/; packed into the AAR under jni/<abi>/. -->
+    <AndroidNativeLibrary Include="native\arm64-v8a\libcodebrix_miniaudio.so" Abi="arm64-v8a" />
+    <AndroidNativeLibrary Include="native\x86_64\libcodebrix_miniaudio.so" Abi="x86_64" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\icon-codebrix-128.png" Pack="true" PackagePath="" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="" />
+    <None Include="..\..\AGENT-README.txt" Pack="true" PackagePath="" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
+  </ItemGroup>
+
   <Target Name="CheckNativeBinaries" BeforeTargets="PrepareForBuild">
     <Error Condition="!Exists('native/arm64-v8a/libcodebrix_miniaudio.so') Or !Exists('native/x86_64/libcodebrix_miniaudio.so')" Text="Build the Android native libraries first: bash tools/build-native.sh (from the repository root)." />
   </Target>
+
 </Project>

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    HOST tests - they run on the development machine, not on Android.
+
+    The library targets net10.0-android36.1, which a desktop test project cannot reference,
+    so there is no ProjectReference here. Instead this project:
+      * compiles the one platform-independent library source file it tests,
+        Internal/MidiByteParser.cs, as a linked file (it is internal; the link makes it
+        visible without InternalsVisibleTo), and
+      * exercises the codec half of the native library through a HOST build of the same C
+        sources - artifacts/native/host/libcodebrix_miniaudio.so, produced by
+        tools/test-host.sh with CODEBRIX_CODECS_ONLY=ON - via the shared engine's codec
+        factory from the pinned Core package.
+    Run it with `bash tools/test-host.sh`, which builds that host library first; see
+    MAINTAINER-README.txt, "TESTING".
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.248.1071" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same Core pin as the library csproj; raise both together. -->
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.269.1270" />
+    <Compile Include="..\..\src\CodeBrix.Audio.Android\Internal\MidiByteParser.cs" Link="Internal\MidiByteParser.cs" />
+    <None Include="..\..\artifacts\native\host\libcodebrix_miniaudio.so" Link="libcodebrix_miniaudio.so" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Assets\*" Link="Assets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

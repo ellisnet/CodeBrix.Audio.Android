@@ -1,3 +1,4 @@
+using System;
 using CodeBrix.Audio.Android.Internal;
 using CodeBrix.Audio.Wave;
 using global::Android.Content;
@@ -8,7 +9,7 @@ namespace CodeBrix.Audio.Android;
 public static class CodeBrixAndroidAudio
 {
     private static readonly object Gate = new();
-    private static Context? _context;
+    private static Context _context;
 
     /// <summary>Registers Oboe and native codecs before the application's first playback.</summary>
     /// <param name="context">Any Android context; only its application context is retained.</param>

@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
 using CodeBrix.Audio.Android;
 using CodeBrix.Audio.Engine.Abstracts;
 using CodeBrix.Audio.Engine.Abstracts.Devices;
@@ -5,9 +10,11 @@ using CodeBrix.Audio.Engine.Components;
 using CodeBrix.Audio.Engine.Providers;
 using CodeBrix.Audio.ModestSynth;
 using CodeBrix.Audio.Opus;
+using global::Android.App;
 using global::Android.Content.PM;
 using global::Android.Media;
 using global::Android.OS;
+using global::Android.Widget;
 using AudioFormat = CodeBrix.Audio.Engine.Structs.AudioFormat;
 using SoundPlayer = CodeBrix.Audio.Engine.Components.SoundPlayer;
 using AndroidBuild = global::Android.OS.Build;
@@ -17,19 +24,19 @@ namespace CodeBrix.Audio.Diagnostics;
 [Activity(Label = "CodeBrix Audio Diagnostics", MainLauncher = true, Exported = true)]
 public sealed class MainActivity : Activity
 {
-    private AndroidAudioEngine _engine = null!;
-    private AndroidAudioFocus _focus = null!;
-    private AudioPlaybackDevice? _playback;
-    private AudioCaptureDevice? _capture;
-    private SoundComponent? _voice;
-    private TextView _status = null!;
-    private TextView _metrics = null!;
-    private Timer? _timer;
+    private AndroidAudioEngine _engine = null;
+    private AndroidAudioFocus _focus = null;
+    private AudioPlaybackDevice _playback;
+    private AudioCaptureDevice _capture;
+    private SoundComponent _voice;
+    private TextView _status = null;
+    private TextView _metrics = null;
+    private Timer _timer;
     private readonly float[] _recorded = new float[48000 * 2 * 10];
     private int _recordedCount;
     private int _route;
 
-    protected override void OnCreate(Bundle? savedInstanceState)
+    protected override void OnCreate(Bundle savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         CodeBrixAndroidAudio.Initialize(this);
@@ -76,11 +83,11 @@ public sealed class MainActivity : Activity
     {
         EnsurePlayback();
         if (!_focus.Request()) throw new InvalidOperationException("Android denied audio focus.");
-        _playback!.Start();
+        _playback.Start();
     }
     private void ReplaceVoice(SoundComponent voice)
     {
-        EnsurePlayback(); _playback!.Stop();
+        EnsurePlayback(); _playback.Stop();
         if (_voice != null) { _playback.MasterMixer.RemoveComponent(_voice); _voice.Dispose(); }
         _voice = voice; _playback.MasterMixer.AddComponent(voice); StartPlayback();
     }
@@ -93,7 +100,7 @@ public sealed class MainActivity : Activity
     {
         // These short synthetic assets are decoded before playback. No file IO or decoding
         // runs in the device callback; long-file apps should use a bounded producer queue.
-        using var source = Assets!.Open($"tone.{codec}");
+        using var source = Assets.Open($"tone.{codec}");
         using var compressed = new MemoryStream(); source.CopyTo(compressed); compressed.Position = 0;
         using var decoder = _engine.CreateDecoder(compressed, codec == "opus" ? "ogg" : codec, AudioFormat.DvdHq);
         var block = new float[4096]; var samples = new List<float>();
@@ -139,7 +146,7 @@ public sealed class MainActivity : Activity
     {
         EnsurePlayback(); _engine.UpdateAudioDevicesInfo();
         var devices = _engine.PlaybackDevices; _route = (_route + 1) % devices.Length;
-        _playback = _engine.SwitchDevice(_playback!, devices[_route]);
+        _playback = _engine.SwitchDevice(_playback, devices[_route]);
         _status.Text = $"Requested output: {devices[_route].Name}. Android routing policy may override the request.";
     }
     private void ListDevices()
