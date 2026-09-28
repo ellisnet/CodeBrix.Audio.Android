@@ -86,12 +86,20 @@ NAMESPACE is simply "CodeBrix.Audio.Android" (no suffix).
                   "android.software.midi" android:required="false" />.
 
 Optional add-ons, referenced by the application when it needs them, exactly as
-on desktop - there is no Android variant of either:
+on desktop - there is no Android variant of these add-ons:
 
   CodeBrix.Audio.ModestSynth.MitLicenseForever   synthesis and instruments
   CodeBrix.Audio.Opus.BsdLicenseForever          Opus decoding and encoding
 
-Both depend on Core only and are registered with their own Register() calls.
+These depend on Core only and are registered with their own Register() calls.
+For the ModestSynthGm instrument library, call
+GeneralMidiInstrumentLibrary.Register(). For Opus, call CodeBrixAudioOpus
+.Register() before loading an Opus file.
+
+CodeBrix.Audio.Samples.FluidR3Gm.MitLicenseForever is an optional SoundFont
+instrument library. Use its Core-dependent package (1.0.270.1185 was tested),
+not the older desktop-dependent release. See Example 8 for APK asset delivery.
+No desktop package or exclusion of desktop binaries is needed.
 When you drive an explicit AndroidAudioEngine, register a codec add-on ON THAT
 ENGINE too (for example CodeBrixAudioOpus.Register(engine)); the shared-output
 registration does not reach engines you construct yourself.
@@ -102,6 +110,38 @@ documents SharedAudioOutput, AudioFilePlayer, the engine's AudioEngine,
 AudioPlaybackDevice, AudioCaptureDevice, FullDuplexDevice, DeviceInfo,
 AudioFormat, MasterMixer, SoundComponent, Recorder and the MIDI device types
 that this package's classes derive from and hand back.
+
+
+APPLICATION SETUP AND OWNERSHIP
+===============================
+Keep the shared CodeBrix.Audio API: AudioFilePlayer for recorded audio,
+SoundEffectClip for preloaded effects, and MidiMusicPlayer for MIDI songs.
+Android supplies the engine, asset delivery, focus and lifecycle integration.
+
+Initialize once during application startup, before constructing players. If
+you want a specific shared format, call SharedAudioOutput.Configure (for
+example Configure(48000)) before the shared output opens. Register the needed
+codecs and instrument libraries before loading files. Registration is not
+the same as loading samples or preparing voices.
+
+Use one application-owned initialization/preparation task so activity
+recreation cannot start competing SoundFont loads or playback. Await asset
+extraction and prepare expensive instruments off the UI thread. Handle errors
+and cancellation, and check that the activity is still foregrounded before an
+asynchronous load completes and starts playback.
+
+Request audio focus before playing; pause or stop on focus loss. Only resume
+after a gain if the user still wants playback and the application is allowed
+to play in its current lifecycle state. For a foreground-only app, pause or
+stop in OnStop. SharedAudioOutput is process-wide: Shutdown affects ALL its
+players, so coordinate it with the owner instead of calling it whenever an
+unrelated activity is destroyed.
+
+AudioFilePlayer's path overload needs a real filesystem path. An Android
+document-picker content:// URI is not one. Open it through ContentResolver
+and copy it to an application-private file before passing that path to the
+player. Likewise, APK assets need materialization (Example 8). Do not request
+broad storage or microphone permissions just to play private audio files.
 
 
 KEY NAMESPACES / USINGS
@@ -134,7 +174,7 @@ reference it.
 
 CORE API REFERENCE
 ==================
-Every public type in this package is listed here. There are seven.
+Every public type in this package is listed here.
 
 --------------------------------------------------------------------------------
 CodeBrixAndroidAudio  (static)  -  the start-up entry point
@@ -470,9 +510,10 @@ THREADING
   Control operations    Start, Stop, Dispose, SwitchDevice, seeking,
                         GetDiagnostics, opening MIDI ports and disposing the
                         engine. They may run on ANY thread EXCEPT an audio
-                        callback: called from inside one they throw
-                        InvalidOperationException immediately rather than
-                        deadlocking or corrupting the stream.
+                        callback. Android backend control methods enforce
+                        this with InvalidOperationException; do not assume
+                        every shared player/transport method has that guard.
+                        Serialize application transport commands yourself.
   Main-thread events    AudioDevicesChanged and AndroidAudioFocus.FocusChanged
                         arrive on Android's main (UI) thread.
   Playback capture      Reads on its own background thread, which counts as a
@@ -605,7 +646,8 @@ Example 3 - Audio focus around playback
     {
         // Runs on the main thread. Anything below AudioFocus.None is a loss.
         if (change < AudioFocus.None) output.Stop();
-        else if (change == AudioFocus.Gain) output.Start();
+        // Resume on Gain only if still foregrounded and the user still
+        // wants playback. This example leaves resuming to a user action.
     };
 
     if (!focus.Request())
@@ -715,28 +757,65 @@ Example 7 - Reading diagnostics on a timer
 --------------------------------------------------------------------------------
 Example 8 - A packaged SoundFont library on Android
 --------------------------------------------------------------------------------
-The application references an instrument package (here CodeBrix.Audio.Samples
-.FluidR3Gm, which ships its SoundFont in the package) and packs the file as an
-Android asset - a package that ships the file adds that item through its own
-build targets, otherwise it is one line in the application's csproj:
+For CodeBrix.Audio.Samples.FluidR3Gm.MitLicenseForever 1.0.270.1185,
+copy-to-output alone does not put the SoundFont in the APK. Add the following
+to the application's csproj; select the package version explicitly or through
+central package management, as in the minimum project below:
 
+    <PropertyGroup>
+      <CodeBrixFluidR3GmCopyAssetsToOutput>false</CodeBrixFluidR3GmCopyAssetsToOutput>
+    </PropertyGroup>
     <ItemGroup>
-      <AndroidAsset Include="FluidR3_GM.sf2" />
+      <PackageReference
+        Include="CodeBrix.Audio.Samples.FluidR3Gm.MitLicenseForever"
+        GeneratePathProperty="true" />
+      <AndroidAsset
+        Include="$(PkgCodeBrix_Audio_Samples_FluidR3Gm_MitLicenseForever)/assets/*"
+        Link="soundfont/%(Filename)%(Extension)" />
     </ItemGroup>
 
-Then, once, on a background thread:
+This includes the SoundFont AND its accompanying notices. If a future package
+adds AndroidAsset items itself, use its documented targets instead of adding
+the same assets twice.
 
+After CodeBrixAndroidAudio.Initialize(context), in the application's single
+asynchronous preparation task:
+
+    using System.IO;
     using CodeBrix.Audio.Android;
     using CodeBrix.Audio.Samples.FluidR3Gm;
 
-    var path = await AndroidPackagedAssets.MaterializeAsync("FluidR3_GM.sf2",
-        new Progress<long>(bytes => ShowProgress(bytes)));
-    FluidR3GmInstrumentLibrary.UseSoundFontAt(path);   // the explicit override
+    var folder = await AndroidPackagedAssets.MaterializeAsync("soundfont");
+    if (!FluidR3GmInstrumentLibrary.IsLoaded)
+        FluidR3GmInstrumentLibrary.UseSoundFontAt(Path.Combine(folder,
+            FluidR3GmInstrumentLibrary.SoundFontFileName));
     FluidR3GmInstrumentLibrary.Register();
 
-Every later launch returns the existing copy immediately. A folder-based
-library is the same call with the asset FOLDER's path, and the library is then
-pointed at the folder (or a file inside it) that comes back.
+UseSoundFontAt must run before the first sample/coverage access loads the font;
+Register itself is lazy and may run earlier. IsLoaded avoids attempting to
+change an already-loaded font on activity recreation; it does not synchronize
+competing initialization tasks. Keep this setup under one application owner.
+
+The SF2 alone is about 142 MiB uncompressed. Budget for both packaged and
+extracted storage, plus sample memory when loaded. MaterializeAsync copies on
+a worker thread and reuses the extracted copy for the same installed build;
+a reinstall/update invalidates that cache. Do not remove files while a library
+is using them. Materialization does not itself load or warm the synthesizer.
+
+MIDI songs use the shared MidiMusicPlayer API with a MidiSequence and a
+synthesizer factory. Resolve "ModestSynthGm" or "FluidR3Gm" through
+InstrumentLibraryRegistry and use CreateMultiTimbralSynthesizer(sampleRate)
+to honor the song's programs and drum channel. Use the sample rate supplied
+to the player's factory; a prepared synthesizer must match that rate.
+
+For ModestSynth's GeneralMidiSynthesizer, prepare program 0 and every program
+used by the song with Prepare(program), and prepare drums with
+PreparePercussion(), on a worker thread BEFORE playback. Account for later
+program changes, not just the first patch. Its multi-timbral factory does not
+pre-warm every instrument. Size prepared voice counts for expected polyphony;
+preparing a small pool is not a guarantee that heavy songs never allocate.
+For FluidR3Gm, do sample loading before playback as well. File extraction,
+sample loading and voice preparation are separate costs.
 
 --------------------------------------------------------------------------------
 Example 9 - MIDI in and out through the engine
@@ -758,12 +837,17 @@ Example 9 - MIDI in and out through the engine
 MINIMUM VIABLE PROJECT TEMPLATE
 ===============================
 An Android application that plays a file. Two files plus the manifest.
+This abbreviated example assumes clip.wav ALREADY exists in FilesDir (copy or
+materialize it first). Add focus handling from Example 3 before playing and
+stop/pause in OnStop for a foreground-only app. The activity shown owns all
+audio; move initialization/shutdown to an application owner for multiple
+activities. Add error handling to report missing files and decode failures.
 
 AudioDemo.csproj:
 
     <Project Sdk="Microsoft.NET.Sdk">
       <PropertyGroup>
-        <TargetFramework>net10.0-android</TargetFramework>
+        <TargetFramework>net10.0-android36.1</TargetFramework>
         <SupportedOSPlatformVersion>33.0</SupportedOSPlatformVersion>
         <OutputType>Exe</OutputType>
         <ApplicationId>com.example.audiodemo</ApplicationId>
@@ -825,6 +909,32 @@ bin/Release/<tfm>/ with `adb install`. Run it on a PHYSICAL device: nothing
 about audio latency, routing or capture is meaningful on an emulator.
 
 
+BUILD CONFIGURATION AND MEASUREMENT
+===================================
+The compile target and minimum device OS are different: net10.0-android36.1
+needs the matching Android SDK platform installed even when running on API 33.
+Use the SDK and JDK supported by your .NET Android workload. Missing generated
+Java types can indicate a compile-platform mismatch, not an audio failure.
+
+Measure a Release build on hardware before judging decoder or synth speed.
+Debug interpreter execution can materially increase managed decoding and
+loop/seek costs. In the physical-device scratch tests with .NET SDK 10.0.401
+and Android workload 36.1.69, an optimized Debug APK used:
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+      <UseInterpreter>false</UseInterpreter>
+      <AndroidUseInterpreter>false</AndroidUseInterpreter>
+      <Optimize>true</Optimize>
+      <AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
+    </PropertyGroup>
+
+The last setting worked around a native activity-method registration failure
+in that particular debuggable, non-interpreted build. These are application
+troubleshooting settings, not library requirements or universal performance
+defaults. Rebuild after changing runtime settings. If using an explicitly
+debuggable manifest for adb run-as diagnostics, keep it out of shipping builds.
+
+
 PERFORMANCE TIPS
 ================
   - PRELOAD. The one thing that reliably ruins Android audio is work inside
@@ -832,11 +942,25 @@ PERFORMANCE TIPS
     on the shared output, or decode to a float[] and use RawDataProvider +
     SoundPlayer on an explicit engine). For long files, keep a bounded
     background decode queue feeding the component; do not let a synchronous
-    stream provider read the disk on the audio thread.
-  - MEASURE with diagnostics. CallbackAllocatedBytes should stay at zero and
-    MaximumCallbackMicroseconds should stay well below one burst's duration
-    (FramesPerBurst / sample rate). If either climbs, find the component
-    responsible before tuning anything else.
+    stream provider read the disk on the audio thread. The current shared
+    AudioFilePlayer uses ChunkedDataProvider, whose refills decode
+    synchronously and whose loop seek can run during rendering. It does NOT
+    provide that background queue automatically. Test long files and looping
+    with your codecs; a successful short playback is not a gapless guarantee.
+  - MEASURE with diagnostics on the device actually playing your graph.
+    IAndroidAudioDevice.GetDiagnostics describes that particular device; a
+    second engine's results do not measure AudioFilePlayer's shared output.
+    SharedAudioOutput currently exposes neither that device nor its Android
+    buffer configuration. BufferBursts below applies to explicit devices.
+  - Compare CallbackAllocatedBytes and XRunCount over a warmed-up interval,
+    keeping startup results separately. Managed allocation counts and
+    MaximumCallbackMicroseconds are device-lifetime values: the maximum
+    cannot be subtracted to get an interval maximum. Native counters reset
+    on stream recovery. Aim for zero additional allocations/underruns under
+    sustained load, and callbacks well within the time budget for their
+    frame count and sample rate. Record route, ABI, build mode and duration.
+    Transport-position polling measures application-visible timing, not
+    speaker latency or the audible gap at a loop boundary.
   - BufferBursts = 2 is the low-latency default. If XRunCount climbs on a
     given device, raise it to 3 or 4; latency grows by one burst per step.
   - PreferExclusive = true asks for the fastest path. Android grants it only
@@ -845,8 +969,9 @@ PERFORMANCE TIPS
   - Ask for the format you want (AudioFormat.DvdHq is 48 kHz stereo float,
     what the hardware usually runs at) and let the stream convert. Do not
     probe SupportedDataFormats: it is empty by design.
-  - One engine per application. Devices are cheap; engines carry a timer, a
-    device watcher and the MIDI backend.
+  - Prefer one engine per application. SharedAudioOutput already owns one
+    when started; constructing another AndroidAudioEngine does not configure
+    it. Explicit engines carry their own timer, watcher and MIDI backend.
   - Register codec add-ons once, at start-up, on the shared output AND on any
     explicit engine you construct.
   - Playback capture is delivered on a background thread with a sample-rate-
@@ -861,10 +986,10 @@ COMMON PITFALLS TO AVOID
     the first activity's OnCreate, before any player is constructed.
   - CONSTRUCTING MiniAudioEngine on Android. That is the desktop engine. On
     Android construct AndroidAudioEngine, or use the shared output.
-  - CONTROL OPERATIONS INSIDE A CALLBACK. Stop, Dispose, SwitchDevice,
-    seeking and GetDiagnostics throw InvalidOperationException when called
-    from the audio thread - on purpose. Post the work to the main thread or a
-    control thread instead.
+  - CONTROL OPERATIONS INSIDE A CALLBACK. Android backend control methods
+    such as device Stop, Dispose and GetDiagnostics enforce a callback-thread
+    guard. Do not assume shared player methods all enforce it. Post transport
+    commands to the main or a control thread; never seek from your callback.
   - LOSING THE DEVICE AFTER SwitchDevice. It disposes the old device and
     returns the new one. `engine.SwitchDevice(output, info);` without keeping
     the result leaves you holding a disposed device; write
@@ -904,8 +1029,9 @@ COMMON PITFALLS TO AVOID
     state stays consistent, but slow work there delays every later message.
   - EXTRACTING A SAMPLE LIBRARY ON THE UI THREAD. AndroidPackagedAssets
     .Materialize copies what may be a very large file; call it from a
-    background thread or use MaterializeAsync. And extract BEFORE registering
-    the instrument library, not inside a render callback.
+    background thread or use MaterializeAsync. Extract and configure the
+    library's path BEFORE first sample access, never inside a render callback.
+    A lazy Register call alone need not load the instrument files.
   - EXPECTING AN INSTRUMENT PACKAGE'S DESKTOP DELIVERY TO WORK ON ANDROID. A
     package that lands its files beside the executable through copy-to-output
     puts nothing in an APK. The file has to be an AndroidAsset, extracted with
