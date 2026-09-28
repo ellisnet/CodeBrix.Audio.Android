@@ -35,7 +35,7 @@
 
   <ItemGroup>
     <!-- The same Core pin as the library csproj; raise both together. -->
-    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.269.1270" />
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.271.1165" />
     <Compile Include="..\..\src\CodeBrix.Audio.Android\Internal\AssetStamp.cs" Link="Internal\AssetStamp.cs" />
     <Compile Include="..\..\src\CodeBrix.Audio.Android\Internal\MidiByteParser.cs" Link="Internal\MidiByteParser.cs" />
     <None Include="..\Assets\*" Link="Assets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
