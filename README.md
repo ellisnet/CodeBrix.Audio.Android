@@ -117,13 +117,15 @@ microphone.Start();
 ### Use a packaged sample library
 
 ```csharp
+using System.IO;
 using CodeBrix.Audio.Android;
 using CodeBrix.Audio.Samples.FluidR3Gm;
 
-// The SoundFont is packaged as an Android asset. Extract it once (a background
-// thread; it is a large file), then point the instrument library at the copy.
-var path = await AndroidPackagedAssets.MaterializeAsync("FluidR3_GM.sf2");
-FluidR3GmInstrumentLibrary.UseSoundFontAt(path);
+// The SoundFont and its notices are packaged as Android assets under soundfont/.
+// Extract them once (a background thread; it is a large file), then point the
+// instrument library at the copy.
+var folder = await AndroidPackagedAssets.MaterializeAsync("soundfont");
+FluidR3GmInstrumentLibrary.UseSoundFontAt(Path.Combine(folder, FluidR3GmInstrumentLibrary.SoundFontFileName));
 FluidR3GmInstrumentLibrary.Register();
 ```
 

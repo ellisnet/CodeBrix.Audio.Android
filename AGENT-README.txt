@@ -51,10 +51,9 @@ recorders and file writers - runs on Android. Applications that drive the
 engine-level API construct an AndroidAudioEngine themselves.
 
 Provenance: the managed assembly is original CodeBrix code. The native library
-it P/Invokes is built in this repository from the vendored sources of Google's
-Oboe (device path, Apache-2.0) and of miniaudio and stb_vorbis (codecs, public
-domain / MIT); THIRD-PARTY-NOTICES.txt is the authoritative record of what came
-from where and what was changed.
+it P/Invokes is built in this repository from vendored third-party sources
+(the device path and the codecs); THIRD-PARTY-NOTICES.txt is the authoritative
+record of what came from where, under which licences, and what was changed.
 
 
 INSTALLATION
@@ -97,8 +96,8 @@ GeneralMidiInstrumentLibrary.Register(). For Opus, call CodeBrixAudioOpus
 .Register() before loading an Opus file.
 
 CodeBrix.Audio.Samples.FluidR3Gm.MitLicenseForever is an optional SoundFont
-instrument library. Use its Core-dependent package (1.0.270.1185 was tested),
-not the older desktop-dependent release. See Example 8 for APK asset delivery.
+instrument library. Use its Core-dependent package, not the older
+desktop-dependent release. See Example 8 for APK asset delivery.
 No desktop package or exclusion of desktop binaries is needed.
 When you drive an explicit AndroidAudioEngine, register a codec add-on ON THAT
 ENGINE too (for example CodeBrixAudioOpus.Register(engine)); the shared-output
@@ -167,7 +166,7 @@ and the Android platform namespaces some members take or return:
                                          //   AudioFocus
   using Android.Media.Projection;        // MediaProjection
 
-CodeBrix.Audio.Android.Internal exists but is entirely internal: the Oboe
+CodeBrix.Audio.Android.Internal exists but is entirely internal: the native
 stream, the device classes, the MIDI byte parser and the P/Invoke layer. Never
 reference it.
 
@@ -212,24 +211,24 @@ is available; this section lists what THIS engine adds or specialises.
       Throws ArgumentNullException, ArgumentException (no application
       context) and PlatformNotSupportedException (no AudioManager).
 
-  event EventHandler? AudioDevicesChanged
+  event EventHandler AudioDevicesChanged
       Raised on Android's MAIN thread after a device is added or removed.
       PlaybackDevices and CaptureDevices have already been refreshed when it
       fires.
 
-  Exception? LastBackendError { get; }
+  Exception LastBackendError { get; }
       The most recent CONTROL-THREAD failure noticed by the service loop: a
       device whose callback threw, a disconnection with recovery disabled, a
       failed recovery, or a capture whose permission was revoked. Callback
       failures are also visible per device in AndroidAudioDiagnostics.
 
   override AudioPlaybackDevice InitializePlaybackDevice(
-      DeviceInfo? deviceInfo, AudioFormat format, DeviceConfig? config = null)
+      DeviceInfo? deviceInfo, AudioFormat format, DeviceConfig config = null)
   override AudioCaptureDevice InitializeCaptureDevice(
-      DeviceInfo? deviceInfo, AudioFormat format, DeviceConfig? config = null)
+      DeviceInfo? deviceInfo, AudioFormat format, DeviceConfig config = null)
   override FullDuplexDevice InitializeFullDuplexDevice(
       DeviceInfo? playbackDeviceInfo, DeviceInfo? captureDeviceInfo,
-      AudioFormat format, DeviceConfig? config = null)
+      AudioFormat format, DeviceConfig config = null)
       Open a device. deviceInfo null, or the entry with Id 0, means the system
       default route. format: sample rate 8000..384000 Hz, 1..8 channels
       (ArgumentOutOfRangeException otherwise; what the hardware honours is up
@@ -242,13 +241,13 @@ is available; this section lists what THIS engine adds or specialises.
       their clocks are not locked to each other.
 
   override AudioCaptureDevice InitializeLoopbackDevice(
-      AudioFormat format, DeviceConfig? config = null)
+      AudioFormat format, DeviceConfig config = null)
       ALWAYS throws NotSupportedException: Android requires user consent for
       playback capture. Use the overload below.
 
   AudioCaptureDevice InitializeLoopbackDevice(
       MediaProjection projection, AudioFormat format,
-      AndroidDeviceConfig? config = null)
+      AndroidDeviceConfig config = null)
       Captures the audio OTHER applications are playing, through a live
       MediaProjection the application obtained with the user's consent. Mono
       or stereo only (NotSupportedException otherwise). Requires RECORD_AUDIO
@@ -259,17 +258,17 @@ is available; this section lists what THIS engine adds or specialises.
       applications that opt out are excluded by the platform, silently. The
       device does NOT own the projection and never stops it; stop the
       projection yourself when done. Its Capability is Loopback. It does not
-      implement IAndroidAudioDevice (it is not an Oboe stream); a read failure
+      implement IAndroidAudioDevice (it is not a native stream); a read failure
       - typically the projection being revoked - stops it and is reported
       through LastBackendError.
 
   override AudioPlaybackDevice SwitchDevice(AudioPlaybackDevice oldDevice,
-      DeviceInfo newDeviceInfo, DeviceConfig? config = null)
+      DeviceInfo newDeviceInfo, DeviceConfig config = null)
   override AudioCaptureDevice SwitchDevice(AudioCaptureDevice oldDevice,
-      DeviceInfo newDeviceInfo, DeviceConfig? config = null)
+      DeviceInfo newDeviceInfo, DeviceConfig config = null)
   override FullDuplexDevice SwitchDevice(FullDuplexDevice oldDevice,
       DeviceInfo? newPlaybackInfo, DeviceInfo? newCaptureInfo,
-      DeviceConfig? config = null)
+      DeviceConfig config = null)
       Move a device to another route. Opens the replacement, stops the old
       device, carries the MasterMixer's components and volume (playback) and
       the OnAudioProcessed subscriptions (capture) across, starts the
@@ -336,7 +335,7 @@ DECISIONS stay with the application.
       accepted) WITHOUT acquiring it. Match usage to the playback device's
       AndroidDeviceConfig.Usage. Throws ArgumentNullException and
       PlatformNotSupportedException.
-  event Action<AudioFocus>? FocusChanged
+  event Action<AudioFocus> FocusChanged
       Raised on Android's MAIN thread with the new focus state - Loss,
       LossTransient, LossTransientCanDuck, Gain. Pause, duck or resume your
       players here; the helper never touches playback itself.
@@ -366,7 +365,7 @@ AndroidAudioDiagnostics (readonly record struct) and IAndroidAudioDevice
       int BufferFrames,              the current hardware buffer size
       int DeviceId,                  the Android device id the stream is on
       int NativeError,               the native error code; 0 = none
-      Exception? CallbackException,  the FIRST managed exception a callback
+      Exception CallbackException,   the FIRST managed exception a callback
                                      threw, if any (rendering has stopped)
       long CallbackAllocatedBytes,   managed bytes allocated INSIDE callbacks
       double MaximumCallbackMicroseconds)  the longest callback observed
@@ -393,7 +392,7 @@ one, or install it on another engine with UseMidiBackend.
   AndroidMidiBackend(Context context)
       Starts a dedicated control thread for device-open callbacks. Throws
       PlatformNotSupportedException when Android MIDI is unavailable.
-  Exception? LastReceiveError { get; }
+  Exception LastReceiveError { get; }
       The most recent receive-side failure - a parser error (for example a
       SysEx over the 1 MiB safety limit) or an exception thrown by one of
       YOUR message subscribers - captured outside the JNI callback so it
@@ -504,7 +503,7 @@ thread-pool thread, never inside an audio callback.
 --------------------------------------------------------------------------------
 THREADING
 --------------------------------------------------------------------------------
-  Audio callbacks       Oboe's real-time audio thread. Your SoundComponents'
+  Audio callbacks       The native real-time audio thread. Your SoundComponents'
                         rendering and capture OnAudioProcessed handlers run
                         here. No blocking, no allocation, no Android API calls.
   Control operations    Start, Stop, Dispose, SwitchDevice, seeking,
@@ -757,7 +756,7 @@ Example 7 - Reading diagnostics on a timer
 --------------------------------------------------------------------------------
 Example 8 - A packaged SoundFont library on Android
 --------------------------------------------------------------------------------
-For CodeBrix.Audio.Samples.FluidR3Gm.MitLicenseForever 1.0.270.1185,
+For CodeBrix.Audio.Samples.FluidR3Gm.MitLicenseForever,
 copy-to-output alone does not put the SoundFont in the APK. Add the following
 to the application's csproj; select the package version explicitly or through
 central package management, as in the minimum project below:
@@ -774,9 +773,8 @@ central package management, as in the minimum project below:
         Link="soundfont/%(Filename)%(Extension)" />
     </ItemGroup>
 
-This includes the SoundFont AND its accompanying notices. If a future package
-adds AndroidAsset items itself, use its documented targets instead of adding
-the same assets twice.
+This includes the SoundFont AND its accompanying notices. The FluidR3Gm
+package adds no AndroidAsset items itself, so these are not duplicated.
 
 After CodeBrixAndroidAudio.Initialize(context), in the application's single
 asynchronous preparation task:
@@ -918,8 +916,8 @@ Java types can indicate a compile-platform mismatch, not an audio failure.
 
 Measure a Release build on hardware before judging decoder or synth speed.
 Debug interpreter execution can materially increase managed decoding and
-loop/seek costs. In the physical-device scratch tests with .NET SDK 10.0.401
-and Android workload 36.1.69, an optimized Debug APK used:
+loop/seek costs. In physical-device scratch tests, an optimized Debug APK
+used:
 
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
       <UseInterpreter>false</UseInterpreter>
@@ -1066,10 +1064,10 @@ WHAT THIS PACKAGE DOES NOT DO
     audio.
   - It does not expose the native library's own API. Everything is reached
     through CodeBrix.Audio's engine abstractions.
-  - It does not, yet, tell an instrument library where its extracted file is
-    by itself: the application hands the path from AndroidPackagedAssets to
-    the library's own "use the file at this path" call. That hand-off is what
-    a coming CodeBrix.Audio.Core seam removes.
+  - It does not tell an instrument library where its extracted file is by
+    itself: it installs no locator in CodeBrix.Audio.Core's PackagedAssets
+    seam, so the application hands the path from AndroidPackagedAssets to the
+    library's own "use the file at this path" call.
 
 
 WORKING EXAMPLES ON GITHUB
@@ -1148,11 +1146,12 @@ QUICK REFERENCE CARD
             CallbackException CallbackAllocatedBytes
             MaximumCallbackMicroseconds   (managed: device lifetime)
 
-  ASSETS    AndroidPackagedAssets.Materialize("FluidR3_GM.sf2")   -> path
+  ASSETS    AndroidPackagedAssets.Materialize("soundfont")   -> folder path
             .MaterializeAsync(path, progress, token)   background thread
             .IsMaterialized(path)  .Remove(path)  .RemoveAll()  .RootDirectory()
             files OR folders; extracted once per installed build; then
-            FluidR3GmInstrumentLibrary.UseSoundFontAt(path)
+            FluidR3GmInstrumentLibrary.UseSoundFontAt(Path.Combine(folder,
+                FluidR3GmInstrumentLibrary.SoundFontFileName))
 
   MIDI      new AndroidMidiBackend(context)   (the engine makes one itself)
             .UpdateMidiDevicesInfo(out inputs, out outputs)
@@ -1168,7 +1167,7 @@ QUICK REFERENCE CARD
 
   THE PUBLIC TYPES
     CodeBrixAndroidAudio     Initialize(context) / IsInitialized
-    AndroidAudioEngine       AudioEngine over Oboe devices + native codecs
+    AndroidAudioEngine       AudioEngine over native devices + native codecs
     AndroidDeviceConfig      init-only stream options (DeviceConfig)
     AndroidAudioFocus        Request / Abandon / FocusChanged (IDisposable)
     AndroidAudioDiagnostics  readonly record struct snapshot

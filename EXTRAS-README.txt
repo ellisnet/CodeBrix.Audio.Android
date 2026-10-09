@@ -45,11 +45,13 @@ samples/AudioDiagnostics/ - the physical-device diagnostics application
     overridden on the command line.
 
   HOW TO BUILD IT
-    Against the published package (once one exists on nuget.org):
+    Against the published package on nuget.org (name a published version; the
+    csproj default is a locally packed build that nuget.org does not carry):
 
-        dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj -c Debug
+        dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj -c Debug \
+          -p:AndroidAudioVersion=<published-version>
         dotnet build samples/AudioDiagnostics/AudioDiagnostics.csproj \
-            -c Release --no-restore
+            -c Release --no-restore -p:AndroidAudioVersion=<published-version>
 
     Against a locally packed package - build the library first (its bin/Release
     holds the .nupkg) or run tools/build-local.sh, then point restore at that

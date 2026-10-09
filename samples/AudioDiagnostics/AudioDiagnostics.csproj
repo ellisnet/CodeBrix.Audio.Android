@@ -7,9 +7,10 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
-    <!-- AndroidAudioVersion: the published CodeBrix.Audio.Android package. Until it is on nuget.org,
-         pass the locally packed version and a local feed on the command line (see MAINTAINER-README.txt, "SAMPLES"). -->
-    <AndroidAudioVersion Condition="'$(AndroidAudioVersion)' == ''">1.0.269.1101</AndroidAudioVersion>
+    <!-- AndroidAudioVersion: the CodeBrix.Audio.Android package version to test. It defaults to the latest
+         version published on nuget.org; to test a locally packed build instead, pass its version and a local
+         feed on the command line (see MAINTAINER-README.txt, "SAMPLES"). -->
+    <AndroidAudioVersion Condition="'$(AndroidAudioVersion)' == ''">1.0.271.1201</AndroidAudioVersion>
   </PropertyGroup>
   <!-- SDK / JDK defaults for this machine, same rule as the library csproj: used only when
        nothing else set them; override with -p:AndroidSdkDirectory=... -p:JavaSdkDirectory=...
