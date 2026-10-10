@@ -25,17 +25,17 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.248.1071" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- The same Core pin as the library csproj; raise both together. -->
-    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.271.1165" />
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.283.1382" />
     <Compile Include="..\..\src\CodeBrix.Audio.Android\Internal\AssetStamp.cs" Link="Internal\AssetStamp.cs" />
     <Compile Include="..\..\src\CodeBrix.Audio.Android\Internal\MidiByteParser.cs" Link="Internal\MidiByteParser.cs" />
     <None Include="..\Assets\*" Link="Assets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
