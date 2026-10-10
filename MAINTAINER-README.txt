@@ -498,6 +498,14 @@ built, changed or shipped from here.
 NOTES
 =====
   - NEVER COMMIT OR PUSH from an agent session. Leave changes in the working
+
+  * FLAC container packets. Core's FlacPacketCodecFactory (built in, beside
+    the Vorbis one) is what plays CodeBrixVideo "master" (.cbvmaster) sound
+    tracks. It is managed and needs nothing from this package, but the Core
+    pin in the library csproj must name a Core that carries it before an
+    application can expect SharedAudioOutput.IsPacketCodecSupported("flac")
+    to be true on Android. The AudioDiagnostics "List packet codecs" button
+    shows what the pinned Core reports.
     tree for Jeremy to review and commit.
   - CodeBrix.Android (the sibling repository) is READ-ONLY from here: do not
     edit or build it.

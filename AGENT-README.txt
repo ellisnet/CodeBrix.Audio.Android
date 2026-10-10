@@ -1055,6 +1055,15 @@ WHAT THIS PACKAGE DOES NOT DO
     codecs and any add-on registered on the engine extend that list.
   - It does not encode anything but WAV natively; the Opus add-on writes
     .opus, and Core's managed writers cover the rest.
+  - It does not decode CONTAINER PACKETS itself - the seam a demultiplexer
+    uses when audio arrives as loose packets with no file framing (what
+    CodeBrix.VideoPlayback feeds the engine for WebM and CodeBrixVideo
+    sound tracks). That seam is entirely managed and works on Android
+    unchanged: Core's built-in packet decoders (Vorbis and FLAC) and the
+    Opus add-on's packet decoder register on the engine exactly as on the
+    desktop, and the device output path is the same one every other sound
+    takes. Ask SharedAudioOutput.IsPacketCodecSupported("flac") (or
+    SupportedPacketCodecIds) to see what the Core you reference carries.
   - It does not lock the playback and capture clocks of a full-duplex device
     together.
   - It does not expose MIDI 2.0 (UMP) ports, perform Bluetooth MIDI discovery

@@ -10,6 +10,7 @@ using CodeBrix.Audio.Engine.Components;
 using CodeBrix.Audio.Engine.Providers;
 using CodeBrix.Audio.ModestSynth;
 using CodeBrix.Audio.Opus;
+using CodeBrix.Audio.Wave;
 using global::Android.App;
 using global::Android.Content.PM;
 using global::Android.Media;
@@ -65,6 +66,7 @@ public sealed class MainActivity : Activity
         AddButton(panel, "Record microphone (up to 10 seconds)", StartCapture);
         AddButton(panel, "Play captured microphone", PlayCapture);
         AddButton(panel, "Refresh audio / MIDI devices", ListDevices);
+        AddButton(panel, "List packet codecs (Core + add-ons)", ListPacketCodecs);
         AddButton(panel, "Stop all", StopAll);
         var scroll = new ScrollView(this); scroll.AddView(panel); SetContentView(scroll);
         _timer = new Timer(_ => RunOnUiThread(UpdateMetrics), null, 500, 500);
@@ -172,6 +174,14 @@ public sealed class MainActivity : Activity
             + "\nInputs: " + string.Join(", ", _engine.CaptureDevices.Select(d => d.Name))
             + "\nMIDI inputs: " + string.Join(", ", _engine.MidiInputDevices.Select(d => d.Name))
             + "\nMIDI outputs: " + string.Join(", ", _engine.MidiOutputDevices.Select(d => d.Name));
+    }
+    private void ListPacketCodecs()
+    {
+        // The packet seam is what CodeBrix.VideoPlayback feeds for WebM / CodeBrixVideo sound tracks. It is
+        // entirely managed: whatever Core and the registered add-ons carry is what Android has.
+        _status.Text = "Packet codecs: " + string.Join(", ", SharedAudioOutput.SupportedPacketCodecIds)
+            + "\nflac packets supported: " + SharedAudioOutput.IsPacketCodecSupported("flac")
+            + " (needs a Core that carries FlacPacketCodecFactory)";
     }
     private void UpdateMetrics()
     {
