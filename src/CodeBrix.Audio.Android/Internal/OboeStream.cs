@@ -3,16 +3,20 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-using CodeBrix.Audio.Engine.Abstracts;
 using CodeBrix.Audio.Engine.Enums;
 using CodeBrix.Audio.Engine.Structs;
 
 namespace CodeBrix.Audio.Android.Internal;
 
+// The render / capture callback: arrivalTimestamp is Stopwatch.GetTimestamp() taken on entry to
+// the native callback, before any managed work.
+internal delegate void OboeCallback(Span<float> samples, Capability capability, long arrivalTimestamp);
+
 internal sealed unsafe class OboeStream : IDisposable
 {
     [ThreadStatic] private static bool _inCallback;
-    private readonly AudioProcessCallback _process;
+    private readonly OboeCallback _process;
+    private readonly Action _restarting;
     private readonly bool _input;
     private readonly AudioFormat _format;
     private readonly AndroidDeviceConfig _config;
@@ -23,9 +27,12 @@ internal sealed unsafe class OboeStream : IDisposable
     private long _maxTicks;
     private bool _disposed;
 
-    internal OboeStream(bool input, int deviceId, AudioFormat format, AndroidDeviceConfig config, AudioProcessCallback process)
+    // restarting (optional) runs on the control thread when TryRecover is about to start a
+    // replacement stream, before any of its callbacks can arrive.
+    internal OboeStream(bool input, int deviceId, AudioFormat format, AndroidDeviceConfig config, OboeCallback process,
+        Action restarting = null)
     {
-        _input = input; _format = format; _config = config; _process = process;
+        _input = input; _format = format; _config = config; _process = process; _restarting = restarting;
         _handle = Open(deviceId);
     }
 
@@ -57,7 +64,7 @@ internal sealed unsafe class OboeStream : IDisposable
         try
         {
             var samples = new Span<float>(data, checked(frames * target._format.Channels));
-            target._process(samples, target._input ? Capability.Record : Capability.Playback);
+            target._process(samples, target._input ? Capability.Record : Capability.Playback, started);
             return 0;
         }
         catch (Exception ex)
@@ -102,7 +109,7 @@ internal sealed unsafe class OboeStream : IDisposable
             // can be retried on the next control tick without losing their diagnostics.
             Native.Stop(_handle);
             var replacement = Open(0);
-            try { Check(Native.Start(replacement), "restart"); }
+            try { _restarting?.Invoke(); Check(Native.Start(replacement), "restart"); }
             catch { replacement.Dispose(); throw; }
             _handle.Dispose();
             _handle = replacement;

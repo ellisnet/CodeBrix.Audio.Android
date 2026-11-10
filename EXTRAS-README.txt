@@ -144,8 +144,9 @@ tests/Assets/ - the audio fixtures
 tests/CodeBrix.Audio.Android.Tests/ - the test project
 ======================================================
   The only other non-package project in the solution, and the executable
-  documentation for the codec path, the MIDI byte parser and the asset-stamp
-  logic behind AndroidPackagedAssets. It runs on the
+  documentation for the codec path, the MIDI byte parser, the asset-stamp
+  logic behind AndroidPackagedAssets, the enumerated DeviceInfo entries and
+  the capture-timestamp plumbing. It runs on the
   development host, not on Android; how and why is in MAINTAINER-README.txt,
   "TESTING". Its runtimes/linux-x64/native/ folder holds the committed host
   build of the codec library the codec tests load; those tests skip on any

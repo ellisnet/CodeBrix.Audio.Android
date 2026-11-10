@@ -86,6 +86,16 @@ REPOSITORY LAYOUT
           AssetStamp.cs           the platform-neutral half of that: asset-path
                                   validation, on-disk layout, the per-install
                                   stamp (linked into the test project)
+          AndroidDeviceInfos.cs   builds the DeviceInfo entries the engine
+                                  enumerates, including OsDeviceId /
+                                  OsDeviceIdBackend "android" (linked into the
+                                  test project)
+          AndroidCaptureDeviceBase.cs
+                                  the shared base of both capture devices: hands
+                                  each buffer to Core's capture stamping with
+                                  the backend's arrival time, and restarts the
+                                  capture timeline after a stream recovery
+                                  (linked into the test project)
           Native.cs               LibraryImport declarations for the cb_oboe_*
                                   C ABI, and the StreamHandle SafeHandle
           OboeStream.cs           one native stream: open / start / stop /
@@ -255,9 +265,10 @@ bridge, which fails on the .NET 10 SDK. The file pins no SDK version. Keep it.
 Why the test project looks the way it does:
   - It targets net10.0. The library targets net10.0-android36.1, and a desktop
     project cannot ProjectReference an Android-targeted one, so there is no
-    project reference and no InternalsVisibleTo. The one platform-independent
-    library source it tests, Internal/MidiByteParser.cs, is compiled in as a
-    linked file.
+    project reference and no InternalsVisibleTo. The platform-independent
+    library sources it tests - the Android-free files under Internal/ that
+    the test csproj lists - are compiled in as linked files. Keep those files
+    free of Android types; that is what lets the host tests see them.
   - It references the pinned Core package directly, because the codec tests go
     through Core's MiniAudioCodecFactory against the host native library.
     Core ships no native code of its own, so nothing collides with the
@@ -268,8 +279,10 @@ Why the test project looks the way it does:
 
 What the tests cover: WAV / MP3 / FLAC / Ogg Vorbis decoding, rate conversion,
 seek to start and mid-file (the seek-reset patch), that the codec-only binary
-exports sf_has_vorbis and no device-IO symbols, WAV encoding, and the MIDI byte
-parser. What they do NOT cover: anything that needs an Android device - Oboe
+exports sf_has_vorbis and no device-IO symbols, WAV encoding, the MIDI byte
+parser, the asset stamp, the DeviceInfo entries (OsDeviceId / OsDeviceIdBackend)
+and how a captured buffer reaches Core's capture timestamps (arrival time,
+timeline restart after recovery). What they do NOT cover: anything that needs an Android device - Oboe
 streams, routing, focus, capture, MIDI hardware. That is DEVICE VALIDATION.
 
 Fixtures under tests/Assets/ are synthetic tones copied from the sibling
@@ -498,15 +511,29 @@ built, changed or shipped from here.
 NOTES
 =====
   - NEVER COMMIT OR PUSH from an agent session. Leave changes in the working
-
-  * FLAC container packets. Core's FlacPacketCodecFactory (built in, beside
+    tree for Jeremy to review and commit.
+  - FLAC container packets. Core's FlacPacketCodecFactory (built in, beside
     the Vorbis one) is what plays CodeBrixVideo "master" (.cbvmaster) sound
     tracks. It is managed and needs nothing from this package, but the Core
     pin in the library csproj must name a Core that carries it before an
     application can expect SharedAudioOutput.IsPacketCodecSupported("flac")
     to be true on Android. The AudioDiagnostics "List packet codecs" button
     shows what the pinned Core reports.
-    tree for Jeremy to review and commit.
+  - CAPTURE TIMESTAMPS. Core stamps every captured buffer in the base
+    AudioCaptureDevice; this package only feeds it. OboeStream.Render takes
+    Stopwatch.GetTimestamp() on entry and both capture devices pass it to
+    InvokeOnAudioProcessed(samples, arrival) through AndroidCaptureDeviceBase;
+    OboeStream.TryRecover calls its restarting hook (ResetCaptureClock) AFTER
+    the replacement opened and BEFORE it starts, so no buffer of the new
+    stream can continue the old timeline. CaptureLatency stays ZERO because
+    the bridge exposes no stream timestamp. Filling it needs a NATIVE change
+    (a new cb_oboe_* export over oboe::AudioStream::getTimestamp(
+    CLOCK_MONOTONIC) - frame position + time - from which the input latency
+    at buffer arrival follows; bump cb_oboe_abi_version and the managed
+    check in CodeBrixAndroidAudio.Initialize together), then the rebuild,
+    verification and commit described under BUILDING.
+  - OsDeviceIdBackend is "android" (AndroidDeviceInfos.OsDeviceIdBackend), a
+    documented public value: never change it.
   - CodeBrix.Android (the sibling repository) is READ-ONLY from here: do not
     edit or build it.
   - NO EMULATOR / AVD on this workstation. Run-time validation is physical

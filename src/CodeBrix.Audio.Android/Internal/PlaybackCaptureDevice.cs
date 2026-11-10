@@ -1,7 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using CodeBrix.Audio.Engine.Abstracts.Devices;
 using CodeBrix.Audio.Engine.Enums;
 using global::Android.Media;
 using global::Android.Media.Projection;
@@ -9,7 +9,7 @@ using AudioFormat = CodeBrix.Audio.Engine.Structs.AudioFormat;
 
 namespace CodeBrix.Audio.Android.Internal;
 
-internal sealed class PlaybackCaptureDevice : AudioCaptureDevice, IServiceDevice
+internal sealed class PlaybackCaptureDevice : AndroidCaptureDeviceBase, IServiceDevice
 {
     private readonly AudioRecord _record;
     private readonly float[] _buffer;
@@ -68,6 +68,7 @@ internal sealed class PlaybackCaptureDevice : AudioCaptureDevice, IServiceDevice
             while (Volatile.Read(ref _run) != 0)
             {
                 int samples = _record.Read(_buffer, 0, _buffer.Length, 0); // READ_BLOCKING
+                long arrival = Stopwatch.GetTimestamp(); // the buffer's arrival, before any managed work
                 if (Volatile.Read(ref _run) == 0) break;
                 if (samples < 0) throw new IOException($"Android playback capture read failed: {samples}. The projection may have been revoked.");
                 if (samples > 0)
@@ -75,7 +76,7 @@ internal sealed class PlaybackCaptureDevice : AudioCaptureDevice, IServiceDevice
                     // Apply the same control-thread guard as Oboe callbacks, including
                     // engine disposal initiated from a playback-capture subscriber.
                     OboeStream.EnterCaptureCallback();
-                    try { InvokeOnAudioProcessed(_buffer.AsSpan(0, samples)); }
+                    try { Deliver(_buffer.AsSpan(0, samples), arrival); }
                     finally { OboeStream.ExitCaptureCallback(); }
                 }
             }

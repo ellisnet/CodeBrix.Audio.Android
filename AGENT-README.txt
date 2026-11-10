@@ -271,7 +271,8 @@ is available; this section lists what THIS engine adds or specialises.
       DeviceConfig config = null)
       Move a device to another route. Opens the replacement, stops the old
       device, carries the MasterMixer's components and volume (playback) and
-      the OnAudioProcessed subscriptions (capture) across, starts the
+      the OnAudioProcessed and OnAudioCaptured subscriptions (capture) across,
+      starts the
       replacement if the old one was running, disposes the old device and
       RETURNS THE REPLACEMENT - keep the return value, the old reference is
       dead. If anything fails the old device is restored and restarted and the
@@ -282,7 +283,10 @@ is available; this section lists what THIS engine adds or specialises.
       Refreshes PlaybackDevices and CaptureDevices (DeviceInfo[] on the base
       class). Each list starts with a "System default" entry, Id 0, IsDefault
       true, followed by Android's hardware device ids and product names.
-      SupportedDataFormats is EMPTY for every entry - an Android route's
+      Every hardware entry carries OsDeviceId (Android's AudioDeviceInfo id in
+      decimal) and OsDeviceIdBackend "android"; the "System default" entry
+      carries null for both (see CAPTURE TIMESTAMPS AND OPERATING-SYSTEM
+      DEVICE IDS). SupportedDataFormats is EMPTY for every entry - an Android route's
       advertised formats do not describe what the stream can negotiate, so
       ask for the format you want and let the stream convert.
 
@@ -493,7 +497,8 @@ An AndroidAudioEngine runs a 250 ms timer that visits each open device and:
     fix the component, then Start() the device again or open a new one.
   * if the stream reported a native error (a disconnection), reopens it on the
     default route when RecoverDisconnectedStreams is true - keeping components
-    and subscriptions - or stops it and records the error when false.
+    and subscriptions - or stops it and records the error when false. A
+    reopened CAPTURE stream starts a fresh capture timeline (see below).
   * for capture devices, re-checks the RECORD_AUDIO permission and stops the
     device if the user revoked it.
 
@@ -501,11 +506,67 @@ Everything the loop does is a control-thread operation, and it runs on a
 thread-pool thread, never inside an audio callback.
 
 --------------------------------------------------------------------------------
+CAPTURE TIMESTAMPS AND OPERATING-SYSTEM DEVICE IDS
+--------------------------------------------------------------------------------
+Both are CodeBrix.Audio.Core features, documented in the CodeBrix.Audio guide
+("CAPTURE DEVICES: OPERATING-SYSTEM DEVICE IDS AND CAPTURE TIMESTAMPS"). This
+is what they mean on Android.
+
+  DeviceInfo.OsDeviceId / DeviceInfo.OsDeviceIdBackend
+      Every hardware entry in PlaybackDevices and CaptureDevices carries
+      OsDeviceId = Android's AudioDeviceInfo.getId(), formatted in decimal
+      with the invariant culture (for example "27"), and OsDeviceIdBackend =
+      "android". That is the id AudioManager.getDevices(), the
+      setPreferredDevice() routing of AudioRecord / AudioTrack and AAudio all
+      use, so an id learned from any of them - for example the input of a USB
+      device that also carries a camera - can be matched:
+
+          string id = audioDeviceInfo.Id.ToString(CultureInfo.InvariantCulture);
+          DeviceInfo? match = engine.CaptureDevices
+              .Where(d => d.OsDeviceIdBackend == "android" && d.OsDeviceId == id)
+              .Select(d => (DeviceInfo?)d).FirstOrDefault();
+
+      Compare ids only when OsDeviceIdBackend matches too. The synthetic
+      "System default" entry (Id 0) names no device, so both are null there;
+      the route Android actually chose for an open stream is DeviceId in its
+      diagnostics. An id identifies a device while it stays connected; after
+      an unplug / replug Android may report a different id, so re-enumerate
+      (AudioDevicesChanged) and match again. DeviceInfo.Id holds the same
+      number, as the value the engine opens.
+
+  OnAudioCaptured / LastCaptureTimestamp (AudioCaptureTimestamp)
+      Every capture device this package opens - InitializeCaptureDevice, the
+      capture half of InitializeFullDuplexDevice, and MediaProjection playback
+      capture - hands each buffer to Core's stamping with its ARRIVAL time
+      taken on entry to the native audio callback (playback capture: the
+      moment its blocking read returns), before any managed work. Timestamp is
+      in Stopwatch ticks; on Android Stopwatch reads CLOCK_MONOTONIC, the
+      clock of System.nanoTime() and of AudioTimestamp.TIMEBASE_MONOTONIC, so
+      it compares directly with other timestamps taken from that clock.
+      OnAudioCaptured handlers run on the audio thread under the same rules as
+      OnAudioProcessed: copy and leave.
+
+      CaptureLatency is ZERO on Android: the package does not read the native
+      stream's own timestamps, so the delay between the hardware sampling a
+      frame and the buffer being handed over is NOT subtracted. Core's anchor
+      already removes the time spent filling each buffer; what remains is the
+      route's input latency, which depends on the device, the route and
+      whether the low-latency path was granted. Measure it on the target
+      device if your application needs better than that.
+
+      The capture timeline restarts - the next buffer is frame 0 with
+      IsDiscontinuity true - when the device is stopped and started again,
+      and when the service loop reopens a disconnected capture stream on the
+      default route. SwitchDevice returns a NEW device, whose timeline starts
+      at frame 0. The two streams of a full-duplex device keep independent
+      clocks.
+
+--------------------------------------------------------------------------------
 THREADING
 --------------------------------------------------------------------------------
   Audio callbacks       The native real-time audio thread. Your SoundComponents'
-                        rendering and capture OnAudioProcessed handlers run
-                        here. No blocking, no allocation, no Android API calls.
+                        rendering and capture OnAudioProcessed / OnAudioCaptured
+                        handlers run here. No blocking, no allocation, no Android API calls.
   Control operations    Start, Stop, Dispose, SwitchDevice, seeking,
                         GetDiagnostics, opening MIDI ports and disposing the
                         engine. They may run on ANY thread EXCEPT an audio
@@ -1009,6 +1070,14 @@ COMMON PITFALLS TO AVOID
     AudioDevicesChanged and SwitchDevice if you want a specific route back.
   - READING DIAGNOSTICS COUNTERS ACROSS A RECOVERY. The native counters reset
     when the stream reopens; only the managed ones are lifetime totals.
+  - TREATING ANDROID CAPTURE TIMESTAMPS AS LATENCY-CORRECTED. CaptureLatency
+    is zero on Android, so AudioCaptureTimestamp.Timestamp is later than the
+    true sampling time by the route's input latency. And a capture timeline
+    restarts (IsDiscontinuity) after a recovery or a Stop / Start - do not
+    assume FrameIndex grows for the device's whole life.
+  - MATCHING OsDeviceId WITHOUT OsDeviceIdBackend, or against the "System
+    default" entry. Its OsDeviceId is null; an id from another API is only
+    comparable when the backend name is "android".
   - RELYING ON A FULL-DUPLEX DEVICE FOR SAMPLE-ACCURATE ALIGNMENT. Its
     playback and capture streams are independent; measure and compensate if
     you need alignment.
@@ -1111,6 +1180,17 @@ the test project covers what can run on a development machine.
                             asset-path validation (relative, forward-slash,
                             nothing that escapes), the on-disk layout of a
                             copy, and the per-install stamp.
+  AndroidDeviceInfosTests.cs
+                            The DeviceInfo entries the engine reports: the
+                            "System default" entry without an OS id, and
+                            OsDeviceId / OsDeviceIdBackend on every hardware
+                            entry, formatted culture-invariantly.
+  AndroidCaptureDeviceBaseTests.cs
+                            How a captured buffer reaches Core's stamping: the
+                            backend's own arrival time, frame-contiguous
+                            timestamps, OnAudioProcessed then OnAudioCaptured,
+                            and the fresh timeline after a stream restart or a
+                            Stop / Start.
   MidiByteParserTests.cs    The MIDI byte parser behind AndroidMidiBackend:
                             running status, fragmentation across callbacks,
                             real-time bytes interleaved inside SysEx, system-
@@ -1134,10 +1214,18 @@ QUICK REFERENCE CARD
             .InitializeLoopbackDevice(format, config?)   ALWAYS THROWS
             output = .SwitchDevice(output, info, config?)   KEEP THE RESULT
             .UpdateAudioDevicesInfo()  .PlaybackDevices  .CaptureDevices
+              DeviceInfo.OsDeviceId = AudioDeviceInfo id ("27"),
+              .OsDeviceIdBackend = "android"; both null on "System default"
             .AudioDevicesChanged (main thread)   .LastBackendError
             .UpdateMidiDevicesInfo()  .MidiInputDevices  .MidiOutputDevices
             .CreateDecoder(stream, "wav"|"mp3"|"flac"|"ogg", format)
             .Dispose()  closes everything
+
+  CAPTURE   capture.OnAudioCaptured += (samples, capability, timestamp) => ..
+            capture.LastCaptureTimestamp   (inside an OnAudioProcessed handler)
+            Stopwatch ticks = CLOCK_MONOTONIC; arrival taken in the native
+            callback; CaptureLatency 0 (input latency NOT subtracted);
+            timeline restarts on Stop/Start and on recovery
 
   CONFIG    new AndroidDeviceConfig { PreferExclusive = true, BufferBursts = 2,
                 Usage = AudioUsageKind.Media,

@@ -191,13 +191,12 @@ public sealed class AndroidAudioEngine : AudioEngine
             CaptureDevices = Enumerate(GetDevicesTargets.Inputs);
         }
     }
+    // Every entry but the synthetic "System default" carries OsDeviceId = AudioDeviceInfo.getId()
+    // in decimal, with OsDeviceIdBackend "android" (see AndroidDeviceInfos).
     private DeviceInfo[] Enumerate(GetDevicesTargets targets) =>
-        [new DeviceInfo { Id = 0, Name = "System default", IsDefault = true, SupportedDataFormats = [] },
-         .. (_manager.GetDevices(targets) ?? []).Select(d => new DeviceInfo
-         {
-             Id = d.Id, Name = d.ProductName?.ToString() ?? d.Type.ToString(),
-             IsDefault = false, SupportedDataFormats = []
-         })];
+        [AndroidDeviceInfos.SystemDefault(),
+         .. (_manager.GetDevices(targets) ?? []).Select(d =>
+             AndroidDeviceInfos.ForDevice(d.Id, d.ProductName?.ToString() ?? d.Type.ToString()))];
 
     internal void EnsureRecordPermission()
     {

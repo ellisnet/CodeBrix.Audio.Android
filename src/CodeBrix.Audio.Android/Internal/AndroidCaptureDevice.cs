@@ -1,11 +1,10 @@
 using System;
-using CodeBrix.Audio.Engine.Abstracts.Devices;
 using CodeBrix.Audio.Engine.Enums;
 using CodeBrix.Audio.Engine.Structs;
 
 namespace CodeBrix.Audio.Android.Internal;
 
-internal sealed class AndroidCaptureDevice : AudioCaptureDevice, IAndroidAudioDevice, IServiceDevice
+internal sealed class AndroidCaptureDevice : AndroidCaptureDeviceBase, IAndroidAudioDevice, IServiceDevice
 {
     private readonly OboeStream _stream;
     private readonly object _gate = new();
@@ -13,9 +12,11 @@ internal sealed class AndroidCaptureDevice : AudioCaptureDevice, IAndroidAudioDe
         : base(engine, format, config)
     {
         Info = info; Capability = Capability.Record;
-        _stream = new(true, (int)(info?.Id ?? 0), format, config, Process);
+        // The arrival time Oboe's callback took on entry goes to the base class, which stamps the
+        // buffer; a stream reopened by recovery starts a fresh capture timeline.
+        _stream = new(true, (int)(info?.Id ?? 0), format, config, Process, StreamRestarted);
     }
-    private void Process(Span<float> samples, Capability capability) => InvokeOnAudioProcessed(samples);
+    private void Process(Span<float> samples, Capability capability, long arrivalTimestamp) => Deliver(samples, arrivalTimestamp);
     public override void Start()
     {
         OboeStream.AssertControlThread();

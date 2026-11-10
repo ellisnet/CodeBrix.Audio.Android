@@ -107,8 +107,9 @@
 
   <ItemGroup>
     <!-- THE ONE PLACE the Core version lives. It must be a PUBLISHED version on nuget.org whenever this
-         package is published; the test and sample csproj files carry the same number. -->
-    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.283.1382" />
+         package is published; the test csproj carries the same number (the sample consumes the packed
+         Android package and gets Core transitively). -->
+    <PackageReference Include="CodeBrix.Audio.Core.MitLicenseForever" Version="1.0.312.48" />
   </ItemGroup>
 
   <ItemGroup>

@@ -30,7 +30,8 @@ This is the Android counterpart of `CodeBrix.Audio.MitLicenseForever`, the deskt
 * One startup call, `CodeBrixAndroidAudio.Initialize(context)`, after which the shared output and all of CodeBrix.Audio's high-level playback APIs run on Android
 * An explicit `AndroidAudioEngine` for applications that drive the engine-level API directly: playback, capture and full-duplex devices, device enumeration, and switching a running device to another route while keeping its mixer components and subscriptions
 * Native decoding of WAV, MP3, FLAC and Ogg Vorbis, and native WAV encoding, through the same codec seam the desktop package uses; managed codecs and the Opus add-on plug in exactly as they do on desktop
-* Microphone capture, once the application holds the `RECORD_AUDIO` permission
+* Microphone capture, once the application holds the `RECORD_AUDIO` permission, with every captured buffer timestamped on the `Stopwatch` clock (`CLOCK_MONOTONIC` on Android) through the shared engine's `OnAudioCaptured` event and `LastCaptureTimestamp` property
+* Android's own device id on every enumerated device, as `DeviceInfo.OsDeviceId` with `OsDeviceIdBackend` `"android"`, for matching a device learned from another Android API
 * Capture of other applications' playback through an application-owned `MediaProjection`, subject to Android's capture policy
 * `AndroidDeviceConfig` for the stream options Android exposes: exclusive low-latency access, buffer size in hardware bursts, playback usage, capture preset, and automatic recovery of a disconnected stream on the default route
 * `AndroidAudioFocus`, an explicit request / abandon helper with a focus-change event the application reacts to
@@ -112,6 +113,30 @@ microphone.OnAudioProcessed += (samples, capability) =>
     // interleaved 32-bit floats; copy them out - do no blocking work here
 };
 microphone.Start();
+```
+
+### Timestamp captured audio and find a device by its Android id
+
+```csharp
+using System.Globalization;
+using System.Linq;
+using CodeBrix.Audio.Android;
+using CodeBrix.Audio.Engine.Structs;
+
+// An AudioDeviceInfo id learned elsewhere, e.g. from AudioManager.GetDevices().
+string id = androidDeviceId.ToString(CultureInfo.InvariantCulture);
+DeviceInfo? input = engine.CaptureDevices
+    .Where(d => d.OsDeviceIdBackend == "android" && d.OsDeviceId == id)
+    .Select(d => (DeviceInfo?)d).FirstOrDefault();   // null: fall back to the system default
+
+using var capture = engine.InitializeCaptureDevice(input, AudioFormat.DvdHq);
+capture.OnAudioCaptured += (samples, capability, timestamp) =>
+{
+    // timestamp.Timestamp: when the buffer's first frame was sampled, in Stopwatch ticks;
+    // timestamp.IsDiscontinuity: the timeline restarted (start, or stream recovery).
+    // Android reports no input latency, so the route's input delay is not subtracted.
+};
+capture.Start();
 ```
 
 ### Use a packaged sample library

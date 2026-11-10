@@ -17,7 +17,7 @@ internal sealed class AndroidPlaybackDevice : AudioPlaybackDevice, IAndroidAudio
         Info = info; Capability = Capability.Playback;
         _stream = new(false, (int)(info?.Id ?? 0), format, config, Process);
     }
-    private void Process(Span<float> samples, Capability capability)
+    private void Process(Span<float> samples, Capability capability, long arrivalTimestamp)
     {
         NotifyFramesRendered(samples.Length / Format.Channels);
         var solo = Engine.GetSoloedComponent();
